@@ -1,0 +1,12 @@
+{
+  "name": "orbit",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @orbit/web dev",
+    "build": "pnpm --filter @orbit/web build",
+    "start": "pnpm --filter @orbit/web start",
+    "lint": "pnpm --filter @orbit/web lint",
+    "typecheck": "pnpm --filter @orbit/web typecheck"
+  },
+  "packageManager": "pnpm@10.29.3"
+}
