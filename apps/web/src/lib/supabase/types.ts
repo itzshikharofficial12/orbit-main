@@ -28,6 +28,53 @@ export type MilestoneStatus = "NOT_STARTED" | "IN_PROGRESS" | "COMPLETED";
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "REVIEW" | "COMPLETED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 
+export type DeliverableStatus =
+  | "PLANNED"
+  | "IN_PROGRESS"
+  | "READY_FOR_REVIEW"
+  | "CHANGES_REQUESTED"
+  | "APPROVED"
+  | "ARCHIVED";
+
+export type ClientRequestStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+export type ClientRequestPriority = "LOW" | "MEDIUM" | "HIGH";
+export type MeetingStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
+
+export type BillingType =
+  | "ONE_TIME"
+  | "INSTALLMENTS"
+  | "RECURRING"
+  | "MILESTONE"
+  | "CUSTOM"
+  | "HYBRID";
+
+export type BillingPlanStatus =
+  | "DRAFT"
+  | "ACTIVE"
+  | "COMPLETED"
+  | "PAUSED"
+  | "CANCELLED";
+
+export type BillingScheduleStatus =
+  | "SCHEDULED"
+  | "DUE"
+  | "PAID"
+  | "PARTIALLY_PAID"
+  | "OVERDUE"
+  | "CANCELLED"
+  | "WAIVED";
+
+export type PaymentMethod = "RAZORPAY" | "BANK_TRANSFER";
+
+export type PaymentStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "PENDING_VERIFICATION"
+  | "PAID"
+  | "FAILED"
+  | "REFUNDED"
+  | "CANCELLED";
+
 export interface Database {
   public: {
     Tables: {
@@ -71,44 +118,37 @@ export interface Database {
         Row: {
           id: string;
           email: string;
-          first_name: string;
+          first_name: string | null;
           last_name: string | null;
           role: OrbitRole;
-          client_id: string | null;
           avatar_url: string | null;
+          client_id: string | null;
           created_at: string;
           updated_at: string;
         };
         Insert: {
           id: string;
           email: string;
-          first_name: string;
+          first_name?: string | null;
           last_name?: string | null;
           role?: OrbitRole;
-          client_id?: string | null;
           avatar_url?: string | null;
+          client_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Update: {
           id?: string;
           email?: string;
-          first_name?: string;
+          first_name?: string | null;
           last_name?: string | null;
           role?: OrbitRole;
-          client_id?: string | null;
           avatar_url?: string | null;
+          client_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [
-          {
-            foreignKeyName: "profiles_id_fkey";
-            columns: ["id"];
-            isOneToOne: true;
-            referencedRelation: "users";
-            referencedColumns: ["id"];
-          },
           {
             foreignKeyName: "profiles_client_id_fkey";
             columns: ["client_id"];
@@ -123,8 +163,8 @@ export interface Database {
           id: string;
           client_id: string;
           name: string;
-          service_type: ServiceType;
           description: string | null;
+          service_type: ServiceType;
           status: ProjectStatus;
           start_date: string | null;
           target_date: string | null;
@@ -135,8 +175,8 @@ export interface Database {
           id?: string;
           client_id: string;
           name: string;
-          service_type: ServiceType;
           description?: string | null;
+          service_type: ServiceType;
           status?: ProjectStatus;
           start_date?: string | null;
           target_date?: string | null;
@@ -147,8 +187,8 @@ export interface Database {
           id?: string;
           client_id?: string;
           name?: string;
-          service_type?: ServiceType;
           description?: string | null;
+          service_type?: ServiceType;
           status?: ProjectStatus;
           start_date?: string | null;
           target_date?: string | null;
@@ -256,6 +296,560 @@ export interface Database {
           }
         ];
       };
+      deliverables: {
+        Row: {
+          id: string;
+          project_id: string;
+          milestone_id: string | null;
+          title: string;
+          description: string | null;
+          status: DeliverableStatus;
+          expected_delivery_date: string | null;
+          url: string | null;
+          client_visible: boolean;
+          notes: string | null;
+          position: number;
+          submitted_at: string | null;
+          approved_at: string | null;
+          approved_by: string | null;
+          changes_requested_at: string | null;
+          changes_requested_by: string | null;
+          client_feedback: string | null;
+          submission_count: number;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          project_id: string;
+          milestone_id?: string | null;
+          title: string;
+          description?: string | null;
+          status?: DeliverableStatus;
+          expected_delivery_date?: string | null;
+          url?: string | null;
+          client_visible?: boolean;
+          notes?: string | null;
+          position?: number;
+          submitted_at?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          changes_requested_at?: string | null;
+          changes_requested_by?: string | null;
+          client_feedback?: string | null;
+          submission_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          project_id?: string;
+          milestone_id?: string | null;
+          title?: string;
+          description?: string | null;
+          status?: DeliverableStatus;
+          expected_delivery_date?: string | null;
+          url?: string | null;
+          client_visible?: boolean;
+          notes?: string | null;
+          position?: number;
+          submitted_at?: string | null;
+          approved_at?: string | null;
+          approved_by?: string | null;
+          changes_requested_at?: string | null;
+          changes_requested_by?: string | null;
+          client_feedback?: string | null;
+          submission_count?: number;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "deliverables_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "deliverables_milestone_id_fkey";
+            columns: ["milestone_id"];
+            isOneToOne: false;
+            referencedRelation: "milestones";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      client_requests: {
+        Row: {
+          id: string;
+          client_id: string;
+          project_id: string;
+          deliverable_id: string;
+          title: string;
+          description: string;
+          status: ClientRequestStatus;
+          priority: ClientRequestPriority;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+          resolved_at: string | null;
+          resolved_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          project_id: string;
+          deliverable_id: string;
+          title: string;
+          description: string;
+          status?: ClientRequestStatus;
+          priority?: ClientRequestPriority;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          project_id?: string;
+          deliverable_id?: string;
+          title?: string;
+          description?: string;
+          status?: ClientRequestStatus;
+          priority?: ClientRequestPriority;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+          resolved_at?: string | null;
+          resolved_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "client_requests_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_requests_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_requests_deliverable_id_fkey";
+            columns: ["deliverable_id"];
+            isOneToOne: false;
+            referencedRelation: "deliverables";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_requests_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "client_requests_resolved_by_fkey";
+            columns: ["resolved_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      notifications: {
+        Row: {
+          id: string;
+          recipient_id: string;
+          type: string;
+          title: string;
+          message: string;
+          link: string | null;
+          is_read: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          recipient_id: string;
+          type: string;
+          title: string;
+          message: string;
+          link?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          recipient_id?: string;
+          type?: string;
+          title?: string;
+          message?: string;
+          link?: string | null;
+          is_read?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "notifications_recipient_id_fkey";
+            columns: ["recipient_id"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      meetings: {
+        Row: {
+          id: string;
+          client_id: string;
+          project_id: string | null;
+          title: string;
+          description: string | null;
+          meeting_url: string;
+          starts_at: string;
+          ends_at: string;
+          status: MeetingStatus;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+          cancelled_at: string | null;
+          completed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          project_id?: string | null;
+          title: string;
+          description?: string | null;
+          meeting_url: string;
+          starts_at: string;
+          ends_at: string;
+          status?: MeetingStatus;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+          cancelled_at?: string | null;
+          completed_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          project_id?: string | null;
+          title?: string;
+          description?: string | null;
+          meeting_url?: string;
+          starts_at?: string;
+          ends_at?: string;
+          status?: MeetingStatus;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+          cancelled_at?: string | null;
+          completed_at?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "meetings_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meetings_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "meetings_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      billing_plans: {
+        Row: {
+          id: string;
+          client_id: string;
+          project_id: string | null;
+          name: string;
+          description: string | null;
+          billing_type: BillingType;
+          total_contract_value: number;
+          currency: string;
+          start_date: string;
+          end_date: string | null;
+          status: BillingPlanStatus;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          project_id?: string | null;
+          name: string;
+          description?: string | null;
+          billing_type: BillingType;
+          total_contract_value?: number;
+          currency?: string;
+          start_date?: string;
+          end_date?: string | null;
+          status?: BillingPlanStatus;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          project_id?: string | null;
+          name?: string;
+          description?: string | null;
+          billing_type?: BillingType;
+          total_contract_value?: number;
+          currency?: string;
+          start_date?: string;
+          end_date?: string | null;
+          status?: BillingPlanStatus;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_plans_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_plans_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_plans_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      billing_schedule_items: {
+        Row: {
+          id: string;
+          billing_plan_id: string;
+          client_id: string;
+          project_id: string | null;
+          invoice_number: string | null;
+          title: string;
+          description: string | null;
+          amount: number;
+          tax_amount: number;
+          currency: string;
+          due_date: string | null;
+          issue_date: string;
+          scheduled_for: string | null;
+          sequence_number: number;
+          milestone_id: string | null;
+          recurrence_reference: string | null;
+          status: BillingScheduleStatus;
+          notes: string | null;
+          terms: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          billing_plan_id: string;
+          client_id: string;
+          project_id?: string | null;
+          invoice_number?: string | null;
+          title: string;
+          description?: string | null;
+          amount: number;
+          tax_amount?: number;
+          currency?: string;
+          due_date?: string | null;
+          issue_date?: string;
+          scheduled_for?: string | null;
+          sequence_number?: number;
+          milestone_id?: string | null;
+          recurrence_reference?: string | null;
+          status?: BillingScheduleStatus;
+          notes?: string | null;
+          terms?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          billing_plan_id?: string;
+          client_id?: string;
+          project_id?: string | null;
+          invoice_number?: string | null;
+          title?: string;
+          description?: string | null;
+          amount?: number;
+          tax_amount?: number;
+          currency?: string;
+          due_date?: string | null;
+          issue_date?: string;
+          scheduled_for?: string | null;
+          sequence_number?: number;
+          milestone_id?: string | null;
+          recurrence_reference?: string | null;
+          status?: BillingScheduleStatus;
+          notes?: string | null;
+          terms?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "billing_schedule_items_billing_plan_id_fkey";
+            columns: ["billing_plan_id"];
+            isOneToOne: false;
+            referencedRelation: "billing_plans";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_schedule_items_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_schedule_items_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "billing_schedule_items_milestone_id_fkey";
+            columns: ["milestone_id"];
+            isOneToOne: false;
+            referencedRelation: "milestones";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      payments: {
+        Row: {
+          id: string;
+          receipt_number: string | null;
+          billing_schedule_item_id: string | null;
+          client_id: string;
+          project_id: string | null;
+          amount: number;
+          currency: string;
+          method: PaymentMethod;
+          status: PaymentStatus;
+          transaction_reference: string | null;
+          razorpay_order_id: string | null;
+          razorpay_payment_id: string | null;
+          paid_at: string | null;
+          verified_at: string | null;
+          verified_by: string | null;
+          notes: string | null;
+          created_by: string;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          receipt_number?: string | null;
+          billing_schedule_item_id?: string | null;
+          client_id: string;
+          project_id?: string | null;
+          amount: number;
+          currency?: string;
+          method?: PaymentMethod;
+          status?: PaymentStatus;
+          transaction_reference?: string | null;
+          razorpay_order_id?: string | null;
+          razorpay_payment_id?: string | null;
+          paid_at?: string | null;
+          verified_at?: string | null;
+          verified_by?: string | null;
+          notes?: string | null;
+          created_by: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          receipt_number?: string | null;
+          billing_schedule_item_id?: string | null;
+          client_id?: string;
+          project_id?: string | null;
+          amount?: number;
+          currency?: string;
+          method?: PaymentMethod;
+          status?: PaymentStatus;
+          transaction_reference?: string | null;
+          razorpay_order_id?: string | null;
+          razorpay_payment_id?: string | null;
+          paid_at?: string | null;
+          verified_at?: string | null;
+          verified_by?: string | null;
+          notes?: string | null;
+          created_by?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "payments_billing_schedule_item_id_fkey";
+            columns: ["billing_schedule_item_id"];
+            isOneToOne: false;
+            referencedRelation: "billing_schedule_items";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_client_id_fkey";
+            columns: ["client_id"];
+            isOneToOne: false;
+            referencedRelation: "clients";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_project_id_fkey";
+            columns: ["project_id"];
+            isOneToOne: false;
+            referencedRelation: "projects";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "payments_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
@@ -264,6 +858,10 @@ export interface Database {
       is_super_admin: {
         Args: Record<PropertyKey, never>;
         Returns: boolean;
+      };
+      get_current_client_id: {
+        Args: Record<PropertyKey, never>;
+        Returns: string | null;
       };
     };
     Enums: {
@@ -274,6 +872,15 @@ export interface Database {
       milestone_status: MilestoneStatus;
       task_status: TaskStatus;
       task_priority: TaskPriority;
+      deliverable_status: DeliverableStatus;
+      client_request_status: ClientRequestStatus;
+      client_request_priority: ClientRequestPriority;
+      meeting_status: MeetingStatus;
+      billing_type: BillingType;
+      billing_plan_status: BillingPlanStatus;
+      billing_schedule_status: BillingScheduleStatus;
+      payment_method: PaymentMethod;
+      payment_status: PaymentStatus;
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -300,3 +907,31 @@ export type MilestoneUpdate = Database["public"]["Tables"]["milestones"]["Update
 export type Task = Database["public"]["Tables"]["tasks"]["Row"];
 export type TaskInsert = Database["public"]["Tables"]["tasks"]["Insert"];
 export type TaskUpdate = Database["public"]["Tables"]["tasks"]["Update"];
+
+export type Deliverable = Database["public"]["Tables"]["deliverables"]["Row"];
+export type DeliverableInsert = Database["public"]["Tables"]["deliverables"]["Insert"];
+export type DeliverableUpdate = Database["public"]["Tables"]["deliverables"]["Update"];
+
+export type ClientRequest = Database["public"]["Tables"]["client_requests"]["Row"];
+export type ClientRequestInsert = Database["public"]["Tables"]["client_requests"]["Insert"];
+export type ClientRequestUpdate = Database["public"]["Tables"]["client_requests"]["Update"];
+
+export type Notification = Database["public"]["Tables"]["notifications"]["Row"];
+export type NotificationInsert = Database["public"]["Tables"]["notifications"]["Insert"];
+export type NotificationUpdate = Database["public"]["Tables"]["notifications"]["Update"];
+
+export type Meeting = Database["public"]["Tables"]["meetings"]["Row"];
+export type MeetingInsert = Database["public"]["Tables"]["meetings"]["Insert"];
+export type MeetingUpdate = Database["public"]["Tables"]["meetings"]["Update"];
+
+export type BillingPlan = Database["public"]["Tables"]["billing_plans"]["Row"];
+export type BillingPlanInsert = Database["public"]["Tables"]["billing_plans"]["Insert"];
+export type BillingPlanUpdate = Database["public"]["Tables"]["billing_plans"]["Update"];
+
+export type BillingScheduleItem = Database["public"]["Tables"]["billing_schedule_items"]["Row"];
+export type BillingScheduleItemInsert = Database["public"]["Tables"]["billing_schedule_items"]["Insert"];
+export type BillingScheduleItemUpdate = Database["public"]["Tables"]["billing_schedule_items"]["Update"];
+
+export type Payment = Database["public"]["Tables"]["payments"]["Row"];
+export type PaymentInsert = Database["public"]["Tables"]["payments"]["Insert"];
+export type PaymentUpdate = Database["public"]["Tables"]["payments"]["Update"];

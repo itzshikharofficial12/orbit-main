@@ -1,5 +1,6 @@
 import { createServerClient } from "@/lib/supabase/server";
 import type { Client, ClientFilters, ClientStats, ClientStatus } from "./types";
+import type { Profile } from "@/lib/supabase/types";
 import { env } from "@/lib/env";
 
 export async function getClients(filters?: ClientFilters): Promise<Client[]> {
@@ -83,4 +84,25 @@ export async function getClientStats(): Promise<ClientStats> {
   });
 
   return stats;
+}
+
+export async function getClientPortalUsers(clientId: string): Promise<Profile[]> {
+  if (!env.isConfigured()) {
+    return [];
+  }
+
+  const supabase = await createServerClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("client_id", clientId)
+    .eq("role", "CLIENT")
+    .order("created_at", { ascending: true });
+
+  if (error) {
+    console.error("Error fetching client portal users:", error.message);
+    return [];
+  }
+
+  return (data as Profile[]) || [];
 }

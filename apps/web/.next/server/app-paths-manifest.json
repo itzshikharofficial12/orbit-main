@@ -1,3 +1,9 @@
 {
-  "/(auth)/login/page": "app/(auth)/login/page.js"
+  "/api/payments/receipts/[paymentId]/pdf/route": "app/api/payments/receipts/[paymentId]/pdf/route.js",
+  "/api/payments/invoices/[invoiceId]/pdf/route": "app/api/payments/invoices/[invoiceId]/pdf/route.js",
+  "/(dashboard)/hq/payments/page": "app/(dashboard)/hq/payments/page.js",
+  "/(dashboard)/client/payments/page": "app/(dashboard)/client/payments/page.js",
+  "/(dashboard)/hq/payments/[invoiceId]/page": "app/(dashboard)/hq/payments/[invoiceId]/page.js",
+  "/(dashboard)/client/payments/[invoiceId]/page": "app/(dashboard)/client/payments/[invoiceId]/page.js",
+  "/(dashboard)/client/page": "app/(dashboard)/client/page.js"
 }

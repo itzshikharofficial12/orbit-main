@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { OrbitBrand } from "@/components/brand/orbit-brand";
 import { loginAction } from "../actions";
 
 export function LoginForm() {
@@ -37,13 +38,8 @@ export function LoginForm() {
     <div className="w-full">
       <div className="flex flex-col space-y-7">
         {/* Brand Header */}
-        <div className="flex flex-col space-y-1.5 text-left">
-          <h2 className="text-2xl font-semibold tracking-tight text-foreground">
-            Orbit
-          </h2>
-          <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground font-mono">
-            by Celestia Studios
-          </p>
+        <div className="text-left">
+          <OrbitBrand size="lg" />
         </div>
 
         {/* Error Alert */}

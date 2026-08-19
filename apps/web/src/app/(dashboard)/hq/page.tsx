@@ -6,6 +6,8 @@ import { OrbitShell } from "@/components/layout/orbit-shell";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { getClientStats } from "@/modules/clients/data";
 import { getProjectStats } from "@/modules/projects/data";
+import { getUpcomingMeetingsForAdmin } from "@/modules/meetings/data";
+import { UpcomingMeetingsHqCard } from "@/modules/meetings/components/upcoming-meetings-hq-card";
 
 export const metadata = {
   title: "HQ — Orbit",
@@ -25,9 +27,10 @@ export default async function HqPage() {
     redirect("/client");
   }
 
-  const [clientStats, projectStats] = await Promise.all([
+  const [clientStats, projectStats, upcomingMeetings] = await Promise.all([
     getClientStats(),
     getProjectStats(),
+    getUpcomingMeetingsForAdmin(3),
   ]);
 
   const firstName = profile.first_name || "there";
@@ -74,6 +77,9 @@ export default async function HqPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Upcoming Meetings Widget */}
+        <UpcomingMeetingsHqCard meetings={upcomingMeetings} />
 
         {/* Operational Shortcuts */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

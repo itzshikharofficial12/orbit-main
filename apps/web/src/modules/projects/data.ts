@@ -157,6 +157,102 @@ export async function getProjectsByClientId(clientId: string): Promise<ProjectWi
   return getProjects({ clientId });
 }
 
+export async function getClientProjectById(
+  projectId: string,
+  clientId: string
+): Promise<ProjectDetails | null> {
+  if (!env.isConfigured() || !clientId) {
+    return null;
+  }
+
+  const supabase = await createServerClient();
+
+  // 1. Fetch Project ensuring client_id matches the authenticated user's client
+  const { data: projectRow, error: projectError } = await supabase
+    .from("projects")
+    .select(`
+      *,
+      client:clients(id, name, status, primary_contact_name, primary_contact_email)
+    `)
+    .eq("id", projectId)
+    .eq("client_id", clientId)
+    .single();
+
+  if (projectError || !projectRow) {
+    return null;
+  }
+
+  const rawProject = projectRow as any;
+
+  // 2. Fetch Milestones for this project ordered by position
+  const { data: milestonesData } = await supabase
+    .from("milestones")
+    .select("id, project_id, name, description, status, position, created_at, updated_at")
+    .eq("project_id", projectId)
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  const rawMilestones = (milestonesData || []) as any[];
+  const milestoneIds = rawMilestones.map((m) => m.id);
+
+  // 3. Fetch ONLY client-visible tasks at the query layer
+  const tasksByMilestone: Record<string, Task[]> = {};
+  if (milestoneIds.length > 0) {
+    const { data: tasksData } = await supabase
+      .from("tasks")
+      .select("*")
+      .in("milestone_id", milestoneIds)
+      .eq("client_visible", true)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    (tasksData || []).forEach((t: any) => {
+      if (!tasksByMilestone[t.milestone_id]) {
+        tasksByMilestone[t.milestone_id] = [];
+      }
+      tasksByMilestone[t.milestone_id].push(t as Task);
+    });
+  }
+
+  const milestones: MilestoneWithTasks[] = rawMilestones.map((m) => {
+    const milestoneTasks = tasksByMilestone[m.id] || [];
+    const completedTaskCount = milestoneTasks.filter((t) => t.status === "COMPLETED").length;
+
+    return {
+      id: m.id,
+      project_id: m.project_id,
+      name: m.name,
+      description: m.description,
+      status: m.status,
+      position: m.position,
+      created_at: m.created_at,
+      updated_at: m.updated_at,
+      tasks: milestoneTasks,
+      task_count: milestoneTasks.length,
+      completed_task_count: completedTaskCount,
+    };
+  });
+
+  const milestoneCount = milestones.length;
+  const completedMilestoneCount = milestones.filter(
+    (m) => m.status === "COMPLETED"
+  ).length;
+
+  const progress =
+    milestoneCount === 0
+      ? 0
+      : Math.round((completedMilestoneCount / milestoneCount) * 100);
+
+  return {
+    ...(rawProject as Project),
+    client: rawProject.client as ProjectWithClient["client"],
+    milestones,
+    milestone_count: milestoneCount,
+    completed_milestone_count: completedMilestoneCount,
+    progress,
+  };
+}
+
 export async function getProjectStats(): Promise<ProjectStats> {
   if (!env.isConfigured()) {
     return { total: 0, active: 0, planning: 0, in_review: 0, on_hold: 0, completed: 0, archived: 0 };

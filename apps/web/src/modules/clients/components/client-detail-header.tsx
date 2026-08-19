@@ -66,7 +66,7 @@ export function ClientDetailHeader({ client }: ClientDetailHeaderProps) {
             value={currentStatus}
             disabled={isUpdating}
             onChange={(e) => handleStatusChange(e.target.value as ClientStatus)}
-            className="h-8 rounded-md border border-border/80 bg-secondary/80 px-2.5 text-xs text-foreground font-medium shadow-xs focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+            className="h-8 rounded-md border border-border/80 bg-secondary/80 px-2.5 text-xs text-foreground font-medium shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
           >
             <option value="ACTIVE">ACTIVE</option>
             <option value="PAUSED">PAUSED</option>

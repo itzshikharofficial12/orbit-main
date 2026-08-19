@@ -10,6 +10,8 @@ export const metadata = {
   description: "Manage Celestia Studios clients and their active engagements.",
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function ClientsPage() {
   const profile = await getAuthenticatedProfile();
 

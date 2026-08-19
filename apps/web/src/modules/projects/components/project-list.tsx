@@ -133,7 +133,7 @@ export function ProjectList({
               <span>{tab.label}</span>
               <span
                 className={cn(
-                  "text-[11px] px-1.5 py-0.2 rounded-full font-mono",
+                  "text-[11px] px-1.5 py-0.5 rounded-full font-mono",
                   selectedStatus === tab.id
                     ? "bg-card text-foreground"
                     : "bg-muted text-muted-foreground"
@@ -164,7 +164,7 @@ export function ProjectList({
             <select
               value={selectedService}
               onChange={(e) => setSelectedService(e.target.value as ServiceType | "ALL")}
-              className="h-9 rounded-md border border-input bg-card/60 px-3 py-1 text-xs text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
+              className="h-9 rounded-md border border-input bg-card/60 px-3 py-1 text-xs text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer"
             >
               <option value="ALL">All Services</option>
               <option value="BRAND_FOUNDATION">Brand Foundation</option>
@@ -178,7 +178,7 @@ export function ProjectList({
               <select
                 value={selectedClientId}
                 onChange={(e) => setSelectedClientId(e.target.value)}
-                className="h-9 rounded-md border border-input bg-card/60 px-3 py-1 text-xs text-foreground shadow-xs focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer max-w-[160px] truncate"
+                className="h-9 rounded-md border border-input bg-card/60 px-3 py-1 text-xs text-foreground shadow-sm focus:outline-none focus:ring-1 focus:ring-ring cursor-pointer max-w-[160px] truncate"
               >
                 <option value="ALL">All Clients</option>
                 {clients.map((c) => (
@@ -237,7 +237,7 @@ export function ProjectList({
       {/* Desktop Data Table */}
       {filteredProjects.length > 0 && (
         <>
-          <div className="hidden md:block rounded-xl border border-border/70 bg-card overflow-hidden shadow-xs">
+          <div className="hidden md:block rounded-xl border border-border/70 bg-card overflow-hidden shadow-sm">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border/60 bg-secondary/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground font-mono">
@@ -336,7 +336,7 @@ export function ProjectList({
               <Link
                 key={project.id}
                 href={`/hq/projects/${project.id}`}
-                className="block rounded-xl border border-border/70 bg-card p-5 shadow-xs hover:border-border transition-colors space-y-3.5"
+                className="block rounded-xl border border-border/70 bg-card p-5 shadow-sm hover:border-border transition-colors space-y-3.5"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1 min-w-0">

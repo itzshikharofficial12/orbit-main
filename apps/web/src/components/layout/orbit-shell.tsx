@@ -1,6 +1,7 @@
 import * as React from "react";
 import type { Profile } from "@/lib/supabase/types";
 import { OrbitSidebar } from "./orbit-sidebar";
+import { NotificationCenter } from "@/modules/notifications/components/notification-center";
 
 interface OrbitShellProps {
   profile: Profile | null;
@@ -44,7 +45,10 @@ export function OrbitShell({
                 {description || defaultDescription}
               </p>
             </div>
-            {actions && <div className="flex items-center gap-3">{actions}</div>}
+            <div className="flex items-center gap-3">
+              {actions}
+              <NotificationCenter />
+            </div>
           </div>
         </header>
 

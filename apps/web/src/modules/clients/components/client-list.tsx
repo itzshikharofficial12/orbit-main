@@ -89,7 +89,7 @@ export function ClientList({ initialClients }: ClientListProps) {
               <span>{tab.label}</span>
               <span
                 className={cn(
-                  "text-[11px] px-1.5 py-0.2 rounded-full font-mono",
+                  "text-[11px] px-1.5 py-0.5 rounded-full font-mono",
                   selectedStatus === tab.id
                     ? "bg-card text-foreground"
                     : "bg-muted text-muted-foreground"
@@ -152,7 +152,7 @@ export function ClientList({ initialClients }: ClientListProps) {
       {/* Desktop Table View (Hidden on mobile) */}
       {filteredClients.length > 0 && (
         <>
-          <div className="hidden md:block rounded-xl border border-border/70 bg-card overflow-hidden shadow-xs">
+          <div className="hidden md:block rounded-xl border border-border/70 bg-card overflow-hidden shadow-sm">
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b border-border/60 bg-secondary/30 text-[11px] font-medium uppercase tracking-wider text-muted-foreground font-mono">
@@ -233,7 +233,7 @@ export function ClientList({ initialClients }: ClientListProps) {
               <Link
                 key={client.id}
                 href={`/hq/clients/${client.id}`}
-                className="block rounded-xl border border-border/70 bg-card p-5 shadow-xs hover:border-border transition-colors"
+                className="block rounded-xl border border-border/70 bg-card p-5 shadow-sm hover:border-border transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1 min-w-0">

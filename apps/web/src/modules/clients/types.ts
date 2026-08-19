@@ -21,3 +21,10 @@ export interface ClientActionResult {
   error?: string;
   fieldErrors?: Record<string, string[]>;
 }
+
+export interface PortalAccessActionResult {
+  success: boolean;
+  message?: string;
+  error?: string;
+  fieldErrors?: Record<string, string[]>;
+}

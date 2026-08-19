@@ -6,15 +6,45 @@
       "static/css/app/layout.css",
       "static/chunks/app/layout.js"
     ],
-    "/page": [
+    "/(dashboard)/layout": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/page.js"
+      "static/chunks/app/(dashboard)/layout.js"
     ],
-    "/(auth)/login/page": [
+    "/(dashboard)/hq/payments/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/login/page.js"
+      "static/chunks/app/(dashboard)/hq/payments/page.js"
+    ],
+    "/api/payments/receipts/[paymentId]/pdf/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/payments/receipts/[paymentId]/pdf/route.js"
+    ],
+    "/(dashboard)/client/payments/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/client/payments/page.js"
+    ],
+    "/(dashboard)/hq/payments/[invoiceId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/hq/payments/[invoiceId]/page.js"
+    ],
+    "/api/payments/invoices/[invoiceId]/pdf/route": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/api/payments/invoices/[invoiceId]/pdf/route.js"
+    ],
+    "/(dashboard)/client/payments/[invoiceId]/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/client/payments/[invoiceId]/page.js"
+    ],
+    "/(dashboard)/client/page": [
+      "static/chunks/webpack.js",
+      "static/chunks/main-app.js",
+      "static/chunks/app/(dashboard)/client/page.js"
     ]
   }
 }

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { getAuthenticatedProfile } from "@/lib/supabase/server";
 import { OrbitShell } from "@/components/layout/orbit-shell";
-import { getClientById } from "@/modules/clients/data";
+import { getClientById, getClientPortalUsers } from "@/modules/clients/data";
 import { getProjectsByClientId } from "@/modules/projects/data";
 import { ClientDetailHeader } from "@/modules/clients/components/client-detail-header";
 import { ClientOverviewTab } from "@/modules/clients/components/client-overview-tab";
@@ -32,9 +32,10 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
     redirect("/client");
   }
 
-  const [client, projects] = await Promise.all([
+  const [client, projects, portalUsers] = await Promise.all([
     getClientById(clientId),
     getProjectsByClientId(clientId),
+    getClientPortalUsers(clientId),
   ]);
 
   if (!client) {
@@ -50,7 +51,11 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
     >
       <div className="space-y-8">
         <ClientDetailHeader client={client} />
-        <ClientOverviewTab client={client} projects={projects} />
+        <ClientOverviewTab
+          client={client}
+          projects={projects}
+          portalUsers={portalUsers}
+        />
       </div>
     </OrbitShell>
   );

@@ -1,17 +1,29 @@
-import { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { getAuthenticatedProfile } from "@/lib/supabase/server";
+import { OrbitShell } from "@/components/layout/orbit-shell";
 import { getProjects } from "@/modules/projects/data";
 import { getClients } from "@/modules/clients/data";
 import { ProjectList } from "@/modules/projects/components/project-list";
 import { AddProjectDialog } from "@/modules/projects/components/add-project-dialog";
 
-export const metadata: Metadata = {
-  title: "Projects | Orbit HQ",
+export const metadata = {
+  title: "Projects — Orbit",
   description: "Manage active engagements and delivery progress across Celestia Studios.",
 };
 
 export const dynamic = "force-dynamic";
 
 export default async function HQProjectsPage() {
+  const profile = await getAuthenticatedProfile();
+
+  if (!profile) {
+    redirect("/login?redirect=/hq/projects");
+  }
+
+  if (profile.role === "CLIENT") {
+    redirect("/client");
+  }
+
   const [projects, clients] = await Promise.all([
     getProjects(),
     getClients({ status: "ALL" }),
@@ -23,29 +35,18 @@ export default async function HQProjectsPage() {
   }));
 
   return (
-    <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-border/40">
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-            Projects
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Manage active engagements and delivery progress across Celestia Studios.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <AddProjectDialog clients={clientOptions} />
-        </div>
-      </div>
-
-      {/* Projects Directory List with Filters & Tables */}
+    <OrbitShell
+      profile={profile}
+      basePath="/hq"
+      title="Projects"
+      description="Manage active engagements and delivery progress across Celestia Studios."
+      actions={<AddProjectDialog clients={clientOptions} />}
+    >
       <ProjectList
         initialProjects={projects}
         clients={clientOptions}
         showClientColumn={true}
       />
-    </div>
+    </OrbitShell>
   );
 }

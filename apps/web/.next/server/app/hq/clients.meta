@@ -1,9 +1,0 @@
-{
-  "status": 307,
-  "headers": {
-    "location": "/login?redirect=/hq/clients",
-    "x-nextjs-stale-time": "300",
-    "x-nextjs-prerender": "1",
-    "x-next-cache-tags": "_N_T_/layout,_N_T_/(dashboard)/layout,_N_T_/(dashboard)/hq/layout,_N_T_/(dashboard)/hq/clients/layout,_N_T_/(dashboard)/hq/clients/page,_N_T_/hq/clients"
-  }
-}

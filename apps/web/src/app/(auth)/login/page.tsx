@@ -3,7 +3,7 @@ import { LoginForm } from "@/modules/auth/components/login-form";
 
 export const metadata = {
   title: "Sign in",
-  description: "Sign in to Orbit by Celestia Studios.",
+  description: "Sign in to ORBIT by Celestia Studios.",
 };
 
 export default function LoginPage() {

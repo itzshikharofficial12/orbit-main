@@ -65,5 +65,26 @@ export const updateClientStatusSchema = z.object({
   status: clientStatusEnum,
 });
 
+export const inviteClientUserSchema = z.object({
+  first_name: z
+    .string()
+    .min(1, "First name is required")
+    .max(100, "First name must be 100 characters or fewer")
+    .trim(),
+  last_name: z
+    .string()
+    .max(100, "Last name must be 100 characters or fewer")
+    .trim()
+    .optional()
+    .or(z.literal("")),
+  email: z
+    .string()
+    .min(1, "Email is required")
+    .email("Please provide a valid email address")
+    .trim()
+    .toLowerCase(),
+});
+
 export type CreateClientInput = z.infer<typeof createClientSchema>;
 export type UpdateClientInput = z.infer<typeof updateClientSchema>;
+export type InviteClientUserInput = z.infer<typeof inviteClientUserSchema>;

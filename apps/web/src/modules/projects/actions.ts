@@ -459,11 +459,97 @@ export async function deleteMilestoneAction(
     }
 
     revalidatePath(`/hq/projects/${projectId}`);
+    revalidatePath(`/client/projects/${projectId}`);
     revalidatePath("/hq/projects");
 
     return {
       success: true,
       data: { id: milestoneId },
+    };
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "An unexpected server error occurred";
+    return {
+      success: false,
+      error: message,
+    };
+  }
+}
+
+export async function moveMilestoneAction(
+  milestoneId: string,
+  projectId: string,
+  direction: "up" | "down"
+): Promise<ProjectActionResult<{ success: boolean }>> {
+  if (!env.isConfigured()) {
+    return {
+      success: false,
+      error: "Supabase connection is not configured.",
+    };
+  }
+
+  try {
+    const supabase = await createServerClient();
+
+    // 1. Fetch all milestones for this project ordered by position
+    const { data: milestones, error: fetchError } = await supabase
+      .from("milestones")
+      .select("id, position")
+      .eq("project_id", projectId)
+      .order("position", { ascending: true })
+      .order("created_at", { ascending: true });
+
+    const rows = (milestones || []) as unknown as Array<{ id: string; position: number | null }>;
+
+    if (fetchError || rows.length < 2) {
+      return {
+        success: false,
+        error: fetchError?.message || "Cannot reorder milestones",
+      };
+    }
+
+    const currentIndex = rows.findIndex((m) => m.id === milestoneId);
+    if (currentIndex === -1) {
+      return {
+        success: false,
+        error: "Milestone not found in project",
+      };
+    }
+
+    const targetIndex = direction === "up" ? currentIndex - 1 : currentIndex + 1;
+    if (targetIndex < 0 || targetIndex >= rows.length) {
+      return {
+        success: true,
+        data: { success: true },
+      };
+    }
+
+    const currentMilestone = rows[currentIndex];
+    const targetMilestone = rows[targetIndex];
+
+    const posA = currentMilestone.position ?? currentIndex;
+    const posB = targetMilestone.position ?? targetIndex;
+
+    const newPosCurrent = posA === posB ? (direction === "up" ? posB - 1 : posB + 1) : posB;
+    const newPosTarget = posA === posB ? posA : posA;
+
+    await Promise.all([
+      supabase
+        .from("milestones")
+        .update({ position: newPosCurrent, updated_at: new Date().toISOString() } as never)
+        .eq("id", currentMilestone.id),
+      supabase
+        .from("milestones")
+        .update({ position: newPosTarget, updated_at: new Date().toISOString() } as never)
+        .eq("id", targetMilestone.id),
+    ]);
+
+    revalidatePath(`/hq/projects/${projectId}`);
+    revalidatePath(`/client/projects/${projectId}`);
+    revalidatePath("/hq/projects");
+
+    return {
+      success: true,
+      data: { success: true },
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "An unexpected server error occurred";
@@ -617,13 +703,19 @@ export async function updateTaskAction(
     };
   }
 
+  const clientVisibleRaw = formData.get("client_visible");
+  const client_visible =
+    clientVisibleRaw === "true" ||
+    clientVisibleRaw === "1" ||
+    clientVisibleRaw === "on";
+
   const raw = {
     title: formData.get("title") as string,
     description: (formData.get("description") as string) || "",
     status: formData.get("status") as string,
     priority: formData.get("priority") as string,
     due_date: (formData.get("due_date") as string) || "",
-    client_visible: formData.get("client_visible") !== "false",
+    client_visible,
   };
 
   const validation = updateTaskSchema.safeParse(raw);
@@ -661,6 +753,9 @@ export async function updateTaskAction(
     }
 
     revalidatePath(`/hq/projects/${projectId}`);
+    revalidatePath(`/client/projects/${projectId}`);
+    revalidatePath("/hq/projects");
+    revalidatePath("/client");
 
     return {
       success: true,
@@ -698,6 +793,9 @@ export async function deleteTaskAction(
     }
 
     revalidatePath(`/hq/projects/${projectId}`);
+    revalidatePath(`/client/projects/${projectId}`);
+    revalidatePath("/hq/projects");
+    revalidatePath("/client");
 
     return {
       success: true,

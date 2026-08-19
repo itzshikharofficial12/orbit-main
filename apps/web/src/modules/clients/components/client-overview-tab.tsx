@@ -14,15 +14,22 @@ import { AddProjectDialog } from "@/modules/projects/components/add-project-dial
 import { ProjectStatusBadge } from "@/modules/projects/components/project-status-badge";
 import { ServiceTypeBadge } from "@/modules/projects/components/service-type-badge";
 import { ProjectProgressBar } from "@/modules/projects/components/project-progress-bar";
+import { PortalAccessCard } from "./portal-access-card";
 import type { Client } from "../types";
 import type { ProjectWithClient } from "@/modules/projects/types";
+import type { Profile } from "@/lib/supabase/types";
 
 interface ClientOverviewTabProps {
   client: Client;
   projects?: ProjectWithClient[];
+  portalUsers?: Profile[];
 }
 
-export function ClientOverviewTab({ client, projects = [] }: ClientOverviewTabProps) {
+export function ClientOverviewTab({
+  client,
+  projects = [],
+  portalUsers = [],
+}: ClientOverviewTabProps) {
   function formatDate(iso: string | null) {
     if (!iso) return "Not specified";
     try {
@@ -119,21 +126,12 @@ export function ClientOverviewTab({ client, projects = [] }: ClientOverviewTabPr
                 <div className="font-medium text-foreground">{formatDate(client.updated_at)}</div>
               </div>
             </div>
-
-            <div className="flex items-center gap-3 text-sm">
-              <div className="h-8 w-8 rounded-md bg-secondary/80 flex items-center justify-center text-muted-foreground border border-border/40 shrink-0">
-                <ShieldCheck className="h-4 w-4" />
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Client Portal Provisioning</div>
-                <div className="text-xs text-muted-foreground">
-                  Portal login will be provisioned in the user access phase.
-                </div>
-              </div>
-            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Portal Access Management */}
+      <PortalAccessCard client={client} portalUsers={portalUsers} />
 
       {/* Notes section if present */}
       {client.notes && (
@@ -205,17 +203,13 @@ export function ClientOverviewTab({ client, projects = [] }: ClientOverviewTabPr
                   {projects.map((project) => (
                     <tr
                       key={project.id}
-                      className="hover:bg-accent/40 transition-colors group cursor-pointer"
-                      onClick={() => {
-                        window.location.href = `/hq/projects/${project.id}`;
-                      }}
+                      className="hover:bg-accent/40 transition-colors group"
                     >
                       <td className="py-3 px-4">
                         <div className="flex flex-col space-y-1">
                           <Link
                             href={`/hq/projects/${project.id}`}
                             className="font-medium text-foreground group-hover:text-primary transition-colors inline-block"
-                            onClick={(e) => e.stopPropagation()}
                           >
                             {project.name}
                           </Link>
@@ -245,7 +239,7 @@ export function ClientOverviewTab({ client, projects = [] }: ClientOverviewTabPr
                         <Link
                           href={`/hq/projects/${project.id}`}
                           className="inline-flex items-center justify-center h-8 w-8 rounded-md text-muted-foreground group-hover:text-foreground hover:bg-secondary transition-colors"
-                          onClick={(e) => e.stopPropagation()}
+                          aria-label={`Open ${project.name} workspace`}
                         >
                           <ChevronRight className="h-4 w-4" />
                         </Link>

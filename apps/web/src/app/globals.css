@@ -3,7 +3,8 @@
 @tailwind utilities;
 
 @layer base {
-  :root {
+  :root,
+  .dark {
     /* Neutral Dark Theme Hierarchy */
     --background: 240 10% 3.9%;          /* #09090b Deep background */
     --foreground: 0 0% 98%;              /* #fafafa Crisp primary text */

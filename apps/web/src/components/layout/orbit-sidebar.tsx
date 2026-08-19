@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Users, FolderKanban, LogOut, Menu, X } from "lucide-react";
+import { LayoutGrid, Users, FolderKanban, Inbox, Video, CreditCard, LogOut, Menu, X } from "lucide-react";
 import type { Profile } from "@/lib/supabase/types";
 import { Badge } from "@/components/ui/badge";
+import { OrbitBrand } from "@/components/brand/orbit-brand";
 import { signOutAction } from "@/modules/auth/actions";
 import { cn } from "@/lib/utils";
 
@@ -25,15 +26,15 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
   const isSuperAdmin = profile?.role === "SUPER_ADMIN";
 
   // Only render navigation items for currently implemented modules
-  const navItems = [
-    {
-      label: "Overview",
-      href: basePath,
-      icon: LayoutGrid,
-      isActive: pathname === basePath,
-    },
-    ...(isSuperAdmin && basePath === "/hq"
+  const navItems =
+    isSuperAdmin && basePath === "/hq"
       ? [
+          {
+            label: "Overview",
+            href: "/hq",
+            icon: LayoutGrid,
+            isActive: pathname === "/hq",
+          },
           {
             label: "Clients",
             href: "/hq/clients",
@@ -46,9 +47,45 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
             icon: FolderKanban,
             isActive: pathname.startsWith("/hq/projects"),
           },
+          {
+            label: "Requests",
+            href: "/hq/requests",
+            icon: Inbox,
+            isActive: pathname.startsWith("/hq/requests"),
+          },
+          {
+            label: "Meetings",
+            href: "/hq/meetings",
+            icon: Video,
+            isActive: pathname.startsWith("/hq/meetings"),
+          },
+          {
+            label: "Payments",
+            href: "/hq/payments",
+            icon: CreditCard,
+            isActive: pathname.startsWith("/hq/payments"),
+          },
         ]
-      : []),
-  ];
+      : [
+          {
+            label: "Overview",
+            href: "/client",
+            icon: LayoutGrid,
+            isActive: pathname === "/client" || pathname.startsWith("/client/projects"),
+          },
+          {
+            label: "Meetings",
+            href: "/client/meetings",
+            icon: Video,
+            isActive: pathname.startsWith("/client/meetings"),
+          },
+          {
+            label: "Payments",
+            href: "/client/payments",
+            icon: CreditCard,
+            isActive: pathname.startsWith("/client/payments"),
+          },
+        ];
 
   return (
     <>
@@ -67,7 +104,7 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
       {/* Mobile Backdrop */}
       {isMobileOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-xs transition-opacity"
+          className="lg:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm transition-opacity"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
@@ -83,19 +120,11 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
         {/* Top: Brand Header & Navigation */}
         <div className="flex flex-col">
           {/* Brand Header */}
-          <div className="p-6 pb-5 border-b border-border/40">
-            <Link
+          <div className="p-6 pb-5 border-b border-border/40 flex items-center">
+            <OrbitBrand
               href={basePath}
-              className="flex flex-col group focus:outline-none"
               onClick={() => setIsMobileOpen(false)}
-            >
-              <span className="text-xl font-semibold tracking-tight text-foreground transition-colors group-hover:text-white">
-                Orbit
-              </span>
-              <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground mt-0.5">
-                by Celestia Studios
-              </span>
-            </Link>
+            />
           </div>
 
           {/* Navigation Items */}

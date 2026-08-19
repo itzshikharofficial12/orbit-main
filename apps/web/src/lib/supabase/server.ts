@@ -80,5 +80,12 @@ export async function getAuthenticatedProfile(): Promise<Profile | null> {
     };
   }
 
-  return profile as Profile;
+  const profileData = profile as Profile;
+  const meta = user.user_metadata || {};
+  const clientId = profileData.client_id || meta.client_id || null;
+
+  return {
+    ...profileData,
+    client_id: clientId,
+  };
 }
