@@ -1,10 +1,25 @@
 import { createServerClient } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/types";
 import type {
   MeetingWithRelations,
   MeetingFilterParams,
   MeetingStats,
 } from "./types";
 import { env } from "@/lib/env";
+
+async function getMeetingReadClient(): Promise<SupabaseClient<Database>> {
+  const admin = getAdminClient();
+  if (admin) return admin as unknown as SupabaseClient<Database>;
+
+  try {
+    return (await createServerClient()) as unknown as SupabaseClient<Database>;
+  } catch {
+    const { createClient } = await import("@supabase/supabase-js");
+    return createClient<Database>(env.supabaseUrl, env.supabaseAnonKey);
+  }
+}
 
 function isSchemaCacheMissingTable(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
@@ -21,7 +36,7 @@ export async function getAdminUpcomingMeetings(): Promise<MeetingWithRelations[]
   if (!env.isConfigured()) return [];
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getMeetingReadClient();
     const { data, error } = await supabase
       .from("meetings")
       .select(`
@@ -53,7 +68,7 @@ export async function getAdminPastMeetings(): Promise<MeetingWithRelations[]> {
   if (!env.isConfigured()) return [];
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getMeetingReadClient();
     const { data, error } = await supabase
       .from("meetings")
       .select(`
@@ -109,7 +124,7 @@ export async function getMeetingsForClient(
   }
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getMeetingReadClient();
 
     const { data, error } = await supabase
       .from("meetings")
@@ -153,7 +168,7 @@ export async function getUpcomingMeetingForClient(
   if (!env.isConfigured() || !clientId) return null;
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getMeetingReadClient();
 
     const { data, error } = await supabase
       .from("meetings")
@@ -183,7 +198,7 @@ export async function getUpcomingMeetingsForAdmin(
   if (!env.isConfigured()) return [];
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getMeetingReadClient();
 
     const { data, error } = await supabase
       .from("meetings")
@@ -212,7 +227,7 @@ export async function getMeetingById(
   if (!env.isConfigured()) return null;
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getMeetingReadClient();
     const { data, error } = await supabase
       .from("meetings")
       .select(`
@@ -240,7 +255,7 @@ export async function getMeetingStats(): Promise<MeetingStats> {
   }
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getMeetingReadClient();
 
     const { data, error } = await supabase
       .from("meetings")

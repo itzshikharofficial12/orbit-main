@@ -5,7 +5,7 @@ const envSchema = z.object({
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z
     .string()
     .min(1, "NEXT_PUBLIC_SUPABASE_ANON_KEY must not be empty"),
-  NEXT_PUBLIC_SITE_URL: z.string().url().optional().default("http://localhost:3000"),
+  NEXT_PUBLIC_SITE_URL: z.string().url().optional().default("http://localhost:3001"),
 });
 
 const clientEnv = {
@@ -35,7 +35,29 @@ export const env = {
     return process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "placeholder-anon-key";
   },
   get siteUrl(): string {
-    return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000";
+    return process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3001";
+  },
+  get razorpayKeyId(): string {
+    return process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "";
+  },
+  get razorpayKeySecret(): string {
+    return process.env.RAZORPAY_KEY_SECRET || "";
+  },
+  get razorpayWebhookSecret(): string {
+    return process.env.RAZORPAY_WEBHOOK_SECRET || "";
+  },
+  get nextPublicRazorpayKeyId(): string {
+    return process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || process.env.RAZORPAY_KEY_ID || "";
+  },
+  isRazorpayConfigured(): boolean {
+    const keyId = this.razorpayKeyId;
+    const keySecret = this.razorpayKeySecret;
+    const isPlaceholder =
+      keyId.includes("your_") ||
+      keyId.includes("placeholder") ||
+      keySecret.includes("your_") ||
+      keySecret.includes("placeholder");
+    return Boolean(keyId && keySecret && !isPlaceholder);
   },
   isConfigured(): boolean {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -55,3 +77,38 @@ export const env = {
     return Boolean(url && key && !isPlaceholderUrl && !isPlaceholderKey);
   },
 };
+
+/**
+ * Resolves the canonical application URL dynamically.
+ * In server actions or request handlers, inspects incoming request headers.
+ * Otherwise falls back to NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL.
+ */
+export async function getCanonicalAppUrl(): Promise<string> {
+  try {
+    const { headers } = await import("next/headers");
+    const headerList = await headers();
+    const host = headerList.get("x-forwarded-host") || headerList.get("host");
+    const proto =
+      headerList.get("x-forwarded-proto") ||
+      (host?.includes("localhost") || host?.includes("127.0.0.1") ? "http" : "https");
+    if (host) {
+      return `${proto}://${host}`.replace(/\/$/, "");
+    }
+  } catch {
+    // headers() throws if called outside a request context
+  }
+
+  if (typeof window !== "undefined" && window.location?.origin) {
+    return window.location.origin.replace(/\/$/, "");
+  }
+
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
+  }
+
+  if (process.env.NEXT_PUBLIC_VERCEL_URL) {
+    return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`.replace(/\/$/, "");
+  }
+
+  return "http://localhost:3001";
+}

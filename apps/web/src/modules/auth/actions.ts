@@ -1,7 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { createServerClient } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
 import { loginSchema } from "./schema";
 import type { AuthActionResult } from "./types";
 import type { Profile } from "@/lib/supabase/types";
@@ -26,7 +28,7 @@ export async function loginAction(formData: FormData): Promise<AuthActionResult 
     };
   }
 
-  let redirectTo = "/hq";
+  let redirectTo = "/login";
 
   try {
     const supabase = await createServerClient();
@@ -49,15 +51,43 @@ export async function loginAction(formData: FormData): Promise<AuthActionResult 
       };
     }
 
-    // Determine target route from profile or metadata
-    const { data: profile } = await supabase
+    // Authoritatively resolve role from database profile using adminClient
+    const adminClient = getAdminClient();
+    const dbClient = (adminClient || supabase) as any;
+
+    const { data: profile } = await dbClient
       .from("profiles")
-      .select("role")
+      .select("role, client_id")
       .eq("id", data.user.id)
       .maybeSingle();
 
-    const role = (profile as { role?: Profile["role"] } | null)?.role || data.user.user_metadata?.role || "SUPER_ADMIN";
-    redirectTo = role === "CLIENT" ? "/client" : "/hq";
+    const role: Profile["role"] =
+      (profile?.role as Profile["role"]) ||
+      (data.user.user_metadata?.role as Profile["role"]) ||
+      "CLIENT";
+
+    if (role === "CLIENT") {
+      redirectTo = "/client";
+    } else if (role === "SUPER_ADMIN" || role === "EMPLOYEE") {
+      redirectTo = "/hq";
+    } else {
+      redirectTo = "/login";
+    }
+
+    // Sync auth metadata if missing or mismatched
+    if (adminClient && (!data.user.user_metadata?.role || data.user.user_metadata.role !== role)) {
+      try {
+        await adminClient.auth.admin.updateUserById(data.user.id, {
+          user_metadata: {
+            ...data.user.user_metadata,
+            role: role,
+            client_id: profile?.client_id || data.user.user_metadata?.client_id || null,
+          },
+        });
+      } catch (syncErr) {
+        console.warn("Notice syncing user metadata:", syncErr);
+      }
+    }
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "An unexpected authentication error occurred";
     return {
@@ -71,8 +101,29 @@ export async function loginAction(formData: FormData): Promise<AuthActionResult 
 
 export async function signOutAction() {
   if (env.isConfigured()) {
-    const supabase = await createServerClient();
-    await supabase.auth.signOut();
+    try {
+      const supabase = await createServerClient();
+      await supabase.auth.signOut({ scope: "global" });
+    } catch (err) {
+      console.warn("Notice signing out from supabase:", err);
+    }
   }
+
+  try {
+    const cookieStore = await cookies();
+    const allCookies = cookieStore.getAll();
+    allCookies.forEach((c) => {
+      if (
+        c.name.includes("supabase") ||
+        c.name.includes("sb-") ||
+        c.name.includes("auth-token")
+      ) {
+        cookieStore.delete(c.name);
+      }
+    });
+  } catch {
+    // Ignore cookie deletion errors in Server Component context
+  }
+
   redirect("/login");
 }

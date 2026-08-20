@@ -30,6 +30,7 @@ import type {
   TaskInsert,
   TaskUpdate,
 } from "@/lib/supabase/types";
+import { notifyClientUsers } from "@/modules/notifications/service";
 import { env } from "@/lib/env";
 
 // ==========================================================
@@ -227,8 +228,24 @@ export async function updateProjectStatusAction(
     }
 
     const updated = data as Project;
+
+    if (updated.client_id) {
+      try {
+        await notifyClientUsers({
+          clientId: updated.client_id,
+          type: "PROJECT_STATUS_CHANGED",
+          title: "Project Status Updated",
+          message: `"${updated.name}" is now marked as ${validation.data.status.replace(/_/g, " ")}.`,
+          link: `/client/projects/${projectId}`,
+        });
+      } catch {
+        // Notification failure should not fail action
+      }
+    }
+
     revalidatePath("/hq/projects");
     revalidatePath(`/hq/projects/${projectId}`);
+    revalidatePath(`/client/projects/${projectId}`);
     revalidatePath(`/hq/clients/${updated.client_id}`);
     revalidatePath("/hq");
 
@@ -355,7 +372,31 @@ export async function updateMilestoneStatusAction(
       };
     }
 
+    if (validation.data.status === "COMPLETED") {
+      try {
+        const { data: proj } = await supabase
+          .from("projects")
+          .select("name, client_id")
+          .eq("id", projectId)
+          .maybeSingle();
+
+        const projectRecord = proj as { name: string; client_id: string | null } | null;
+        if (projectRecord?.client_id) {
+          await notifyClientUsers({
+            clientId: projectRecord.client_id,
+            type: "MILESTONE_COMPLETED",
+            title: "Milestone Completed",
+            message: `"${(data as Milestone).name}" milestone has been completed for ${projectRecord.name}.`,
+            link: `/client/projects/${projectId}`,
+          });
+        }
+      } catch {
+        // Notification failure should not fail action
+      }
+    }
+
     revalidatePath(`/hq/projects/${projectId}`);
+    revalidatePath(`/client/projects/${projectId}`);
     revalidatePath("/hq/projects");
 
     return {

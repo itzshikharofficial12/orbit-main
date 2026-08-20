@@ -19,8 +19,9 @@ export function LoginForm() {
     setIsLoading(true);
     setErrorMessage(null);
 
+    const cleanEmail = email.trim().toLowerCase();
     const formData = new FormData();
-    formData.append("email", email);
+    formData.append("email", cleanEmail);
     formData.append("password", password);
 
     try {

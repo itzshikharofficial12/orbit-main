@@ -18,7 +18,7 @@ import type {
   BillingPlanStatus,
 } from "./types";
 import { calculateScheduleStatus, formatCurrency } from "./utils";
-import { notifyClientUsers } from "@/modules/notifications/service";
+import { notifyClientUsers, notifySuperAdmins } from "@/modules/notifications/service";
 import { env } from "@/lib/env";
 
 export async function createBillingPlanAction(
@@ -378,6 +378,422 @@ export async function updateBillingPlanStatusAction(
       success: true,
       plan: updated as unknown as BillingPlan,
     };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Server Action: Verifies and approves a pending manual bank transfer.
+ */
+export async function verifyBankTransferAction(params: {
+  paymentId: string;
+  notes?: string;
+}): Promise<PaymentActionResult> {
+  if (!env.isConfigured()) {
+    return { success: false, error: "Supabase environment not configured." };
+  }
+
+  const profile = await getAuthenticatedProfile();
+  if (!profile || profile.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized. Super Admin access required." };
+  }
+
+  const { paymentId, notes } = params;
+  if (!paymentId) {
+    return { success: false, error: "Payment ID is required." };
+  }
+
+  try {
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
+
+    // 1. Fetch Payment Record
+    const { data: existingPayment, error: fetchErr } = await supabase
+      .from("payments")
+      .select(`
+        *,
+        client:clients(id, name),
+        schedule_item:billing_schedule_items(id, title, amount, currency, billing_plan_id)
+      `)
+      .eq("id", paymentId)
+      .maybeSingle();
+
+    if (fetchErr || !existingPayment) {
+      return { success: false, error: "Payment record not found." };
+    }
+
+    const payment = existingPayment as any;
+
+    if (payment.status === "PAID") {
+      return { success: true, payment: payment as unknown as Payment };
+    }
+
+    // 2. Mark Payment as PAID & Verified
+    const { data: updatedPayment, error: updateErr } = await supabase
+      .from("payments")
+      .update({
+        status: "PAID",
+        verified_at: new Date().toISOString(),
+        verified_by: profile.id,
+        notes: notes || payment.notes || "Bank transfer verified by Admin.",
+      } as never)
+      .eq("id", paymentId)
+      .select()
+      .single();
+
+    if (updateErr || !updatedPayment) {
+      return { success: false, error: updateErr?.message || "Failed to update payment status." };
+    }
+
+    // 3. Recalculate schedule item status if linked
+    if (payment.billing_schedule_item_id) {
+      const scheduleItemId = payment.billing_schedule_item_id;
+
+      const { data: scheduleItem } = await supabase
+        .from("billing_schedule_items")
+        .select("id, amount, due_date, billing_plan_id, status")
+        .eq("id", scheduleItemId)
+        .maybeSingle();
+
+      if (scheduleItem) {
+        const { data: itemPayments } = await supabase
+          .from("payments")
+          .select("amount")
+          .eq("billing_schedule_item_id", scheduleItemId)
+          .eq("status", "PAID");
+
+        const totalPaid = (itemPayments || []).reduce(
+          (acc, p) => acc + (Number(p.amount) || 0),
+          0
+        );
+
+        const newScheduleStatus = calculateScheduleStatus(scheduleItem, totalPaid);
+
+        await supabase
+          .from("billing_schedule_items")
+          .update({
+            status: newScheduleStatus,
+            updated_at: new Date().toISOString(),
+          } as never)
+          .eq("id", scheduleItemId);
+
+        // Check if all schedule items in the plan are PAID
+        if (scheduleItem.billing_plan_id) {
+          const { data: allPlanItems } = await supabase
+            .from("billing_schedule_items")
+            .select("id, amount, status")
+            .eq("billing_plan_id", scheduleItem.billing_plan_id);
+
+          if (allPlanItems && allPlanItems.length > 0) {
+            const allPaid = allPlanItems.every(
+              (it) => it.status === "PAID" || it.status === "WAIVED"
+            );
+            if (allPaid) {
+              await supabase
+                .from("billing_plans")
+                .update({
+                  status: "COMPLETED",
+                  updated_at: new Date().toISOString(),
+                } as never)
+                .eq("id", scheduleItem.billing_plan_id);
+            }
+          }
+        }
+      }
+    }
+
+    // 4. Notify Client
+    const formattedAmount = formatCurrency(payment.amount, payment.currency || "INR");
+    await notifyClientUsers({
+      clientId: payment.client_id,
+      type: "PAYMENT_CONFIRMED",
+      title: "Bank Transfer Verified",
+      message: `Your bank transfer payment of ${formattedAmount} (UTR: ${payment.transaction_reference || "N/A"}) has been verified and confirmed.`,
+      link: payment.billing_schedule_item_id
+        ? `/client/payments/${payment.billing_schedule_item_id}`
+        : "/client/payments",
+    });
+
+    // 5. Revalidate Paths
+    try {
+      revalidatePath("/hq/payments");
+      revalidatePath("/hq");
+      revalidatePath("/client/payments");
+      revalidatePath("/client");
+      if (payment.billing_schedule_item_id) {
+        revalidatePath(`/hq/payments/${payment.billing_schedule_item_id}`);
+        revalidatePath(`/client/payments/${payment.billing_schedule_item_id}`);
+      }
+    } catch {
+      // Safe fallback
+    }
+
+    return {
+      success: true,
+      payment: updatedPayment as unknown as Payment,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Server Action: Rejects a submitted bank transfer with an authoritative reason.
+ */
+export async function rejectBankTransferAction(params: {
+  paymentId: string;
+  reason: string;
+}): Promise<PaymentActionResult> {
+  if (!env.isConfigured()) {
+    return { success: false, error: "Supabase environment not configured." };
+  }
+
+  const profile = await getAuthenticatedProfile();
+  if (!profile || profile.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized. Super Admin access required." };
+  }
+
+  const { paymentId, reason } = params;
+  if (!paymentId) {
+    return { success: false, error: "Payment ID is required." };
+  }
+  if (!reason || reason.trim().length === 0) {
+    return { success: false, error: "A specific rejection reason is required." };
+  }
+
+  try {
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
+
+    const { data: existingPayment, error: fetchErr } = await supabase
+      .from("payments")
+      .select(`
+        *,
+        client:clients(id, name),
+        schedule_item:billing_schedule_items(id, title, amount, currency)
+      `)
+      .eq("id", paymentId)
+      .maybeSingle();
+
+    if (fetchErr || !existingPayment) {
+      return { success: false, error: "Payment record not found." };
+    }
+
+    const payment = existingPayment as any;
+
+    // Update status to FAILED and record audit reason
+    const { data: updatedPayment, error: updateErr } = await supabase
+      .from("payments")
+      .update({
+        status: "FAILED",
+        verified_at: new Date().toISOString(),
+        verified_by: profile.id,
+        notes: `[REJECTED]: ${reason.trim()}`,
+      } as never)
+      .eq("id", paymentId)
+      .select()
+      .single();
+
+    if (updateErr || !updatedPayment) {
+      return { success: false, error: updateErr?.message || "Failed to update payment status." };
+    }
+
+    // Notify Client with specific explanation
+    const formattedAmount = formatCurrency(payment.amount, payment.currency || "INR");
+    await notifyClientUsers({
+      clientId: payment.client_id,
+      type: "PAYMENT_FAILED",
+      title: "Bank Transfer Verification Rejected",
+      message: `Your bank transfer payment of ${formattedAmount} (UTR: ${payment.transaction_reference || "N/A"}) could not be verified: "${reason.trim()}". Please re-submit your transfer details.`,
+      link: payment.billing_schedule_item_id
+        ? `/client/payments/${payment.billing_schedule_item_id}`
+        : "/client/payments",
+    });
+
+    try {
+      revalidatePath("/hq/payments");
+      revalidatePath("/hq");
+      revalidatePath("/client/payments");
+      revalidatePath("/client");
+      if (payment.billing_schedule_item_id) {
+        revalidatePath(`/hq/payments/${payment.billing_schedule_item_id}`);
+        revalidatePath(`/client/payments/${payment.billing_schedule_item_id}`);
+      }
+    } catch {
+      // Safe fallback
+    }
+
+    return {
+      success: true,
+      payment: updatedPayment as unknown as Payment,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Server Action: Client submits a bank wire transfer / UTR for verification.
+ */
+export async function submitBankTransferAction(
+  formData: FormData
+): Promise<PaymentActionResult> {
+  if (!env.isConfigured()) {
+    return { success: false, error: "Supabase environment not configured." };
+  }
+
+  const profile = await getAuthenticatedProfile();
+  if (!profile) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  const scheduleItemId = formData.get("schedule_item_id") as string;
+  const amountStr = formData.get("amount") as string;
+  const transactionReference = (formData.get("transaction_reference") as string)?.trim();
+  const paidAt = formData.get("paid_at") as string;
+  const notes = (formData.get("notes") as string)?.trim();
+
+  if (!scheduleItemId || !amountStr || !transactionReference) {
+    return { success: false, error: "Invoice ID, amount, and UTR/reference are required." };
+  }
+
+  const amount = parseFloat(amountStr);
+  if (isNaN(amount) || amount <= 0) {
+    return { success: false, error: "Amount must be greater than zero." };
+  }
+
+  try {
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
+
+    // 1. Fetch schedule item to verify ownership
+    const { data: scheduleItem, error: itemErr } = await supabase
+      .from("billing_schedule_items")
+      .select(`
+        *,
+        client:clients(id, name),
+        project:projects(id, name),
+        billing_plan:billing_plans(id, name)
+      `)
+      .eq("id", scheduleItemId)
+      .maybeSingle();
+
+    if (itemErr || !scheduleItem) {
+      return { success: false, error: "Invoice/schedule item not found." };
+    }
+
+    const item = scheduleItem as any;
+
+    if (profile.role !== "SUPER_ADMIN" && profile.client_id !== item.client_id) {
+      return { success: false, error: "Forbidden: You do not have access to this invoice." };
+    }
+
+    // 2. Insert PENDING payment record
+    const { data: newPayment, error: insertErr } = await supabase
+      .from("payments")
+      .insert({
+        client_id: item.client_id,
+        project_id: item.project_id || null,
+        billing_schedule_item_id: item.id,
+        amount,
+        currency: item.currency || "INR",
+        method: "BANK_TRANSFER",
+        status: "PENDING",
+        transaction_reference: transactionReference,
+        paid_at: paidAt ? new Date(paidAt).toISOString() : new Date().toISOString(),
+        notes: notes || "Bank transfer submitted by client for verification.",
+        created_by: profile.id,
+      } as never)
+      .select()
+      .single();
+
+    if (insertErr || !newPayment) {
+      return { success: false, error: insertErr?.message || "Failed to submit bank transfer." };
+    }
+
+    // 3. Notify Super Admins
+    const formattedAmount = formatCurrency(amount, item.currency || "INR");
+    await notifySuperAdmins({
+      type: "PAYMENT_CREATED",
+      title: "Bank Transfer Submitted",
+      message: `${item.client?.name || "Client"} submitted a bank transfer of ${formattedAmount} (UTR: ${transactionReference}) for "${item.title}".`,
+      link: `/hq/payments/${item.id}`,
+    });
+
+    try {
+      revalidatePath("/hq/payments");
+      revalidatePath("/hq");
+      revalidatePath("/client/payments");
+      revalidatePath("/client");
+      revalidatePath(`/hq/payments/${item.id}`);
+      revalidatePath(`/client/payments/${item.id}`);
+    } catch {
+      // Safe fallback
+    }
+
+    return {
+      success: true,
+      payment: newPayment as unknown as Payment,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Server Action: Client submits a payment/billing query to Super Admins.
+ */
+export async function submitPaymentQueryAction(params: {
+  subject: string;
+  message: string;
+  scheduleItemId?: string;
+  priority?: "LOW" | "MEDIUM" | "HIGH";
+}): Promise<PaymentActionResult> {
+  if (!env.isConfigured()) {
+    return { success: false, error: "Supabase environment not configured." };
+  }
+
+  const profile = await getAuthenticatedProfile();
+  if (!profile) {
+    return { success: false, error: "Authentication required." };
+  }
+
+  const { subject, message, scheduleItemId, priority = "HIGH" } = params;
+  if (!subject?.trim() || !message?.trim()) {
+    return { success: false, error: "Subject and message are required." };
+  }
+
+  try {
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
+
+    let invoiceContext = "";
+    if (scheduleItemId) {
+      const { data: item } = await supabase
+        .from("billing_schedule_items")
+        .select("title, amount, currency, invoice_number")
+        .eq("id", scheduleItemId)
+        .maybeSingle();
+
+      if (item) {
+        invoiceContext = ` (Invoice: ${item.invoice_number || item.title} - ${item.currency} ${item.amount})`;
+      }
+    }
+
+    // Notify Super Admins with high priority
+    await notifySuperAdmins({
+      type: "PAYMENT_CREATED",
+      title: `[Billing Query]: ${subject.trim()}`,
+      message: `Client ${profile.first_name || ""} ${profile.last_name || ""} (${profile.email}) submitted a payment query${invoiceContext}:\n\n"${message.trim()}"`,
+      link: scheduleItemId ? `/hq/payments/${scheduleItemId}` : "/hq/payments",
+    });
+
+    return { success: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Unexpected server error";
     return { success: false, error: msg };

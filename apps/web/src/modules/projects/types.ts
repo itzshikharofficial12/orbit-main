@@ -29,6 +29,18 @@ export interface ProjectWithClient extends Project {
   progress: number;
 }
 
+export interface ProjectWithNextStep extends ProjectWithClient {
+  in_progress_milestone_count: number;
+  planned_milestone_count: number;
+  next_milestone?: {
+    id: string;
+    name: string;
+    status: MilestoneStatus;
+    position: number;
+  } | null;
+  next_step?: string;
+}
+
 export interface MilestoneWithTasks extends Milestone {
   tasks: Task[];
   task_count: number;

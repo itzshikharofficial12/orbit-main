@@ -5,6 +5,9 @@ import {
   getBillingPlansForAdmin,
   getPaymentsForAdmin,
   getPaymentOverviewMetrics,
+  getPendingBankTransfers,
+  getOverdueScheduleItems,
+  getUpcomingScheduleItems,
 } from "@/modules/payments/data";
 import { getClients } from "@/modules/clients/data";
 import { getProjects } from "@/modules/projects/data";
@@ -28,10 +31,13 @@ export default async function HqPaymentsPage() {
     redirect("/client");
   }
 
-  const [plans, payments, metrics, clients, projects] = await Promise.all([
+  const [plans, payments, metrics, pendingTransfers, overdueItems, upcomingItems, clients, projects] = await Promise.all([
     getBillingPlansForAdmin(),
     getPaymentsForAdmin(),
     getPaymentOverviewMetrics(),
+    getPendingBankTransfers(),
+    getOverdueScheduleItems(),
+    getUpcomingScheduleItems(),
     getClients(),
     getProjects(),
   ]);
@@ -41,12 +47,15 @@ export default async function HqPaymentsPage() {
       profile={profile}
       basePath="/hq"
       title="Payments"
-      description="Manage commercial billing plans, expected schedules, and verified receipts."
+      description="Manage billing, invoices, collections and outstanding payments."
     >
       <AdminPaymentsDirectory
         initialPlans={plans}
         initialPayments={payments}
         metrics={metrics}
+        pendingTransfers={pendingTransfers}
+        overdueItems={overdueItems}
+        upcomingItems={upcomingItems}
         clients={clients}
         projects={projects}
       />

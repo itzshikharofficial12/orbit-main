@@ -1,6 +1,7 @@
 import { createServerClient as createSupabaseServerClient, type CookieOptions } from "@supabase/ssr";
 import { cookies } from "next/headers";
 import type { Database, Profile } from "./types";
+import { getAdminClient } from "./admin";
 import { env } from "@/lib/env";
 
 export async function createServerClient() {
@@ -52,40 +53,44 @@ export async function getAuthenticatedProfile(): Promise<Profile | null> {
 
   if (!env.isConfigured()) return null;
 
-  const supabase = await createServerClient();
-  const { data: profile, error } = await supabase
+  // Use getAdminClient() if available to reliably fetch profile record without RLS policy recursion
+  const adminClient = getAdminClient();
+  const dbClient = (adminClient || (await createServerClient())) as any;
+
+  const { data: profile, error } = await dbClient
     .from("profiles")
     .select("*")
     .eq("id", user.id)
-    .single();
+    .maybeSingle();
 
-  if (error || !profile) {
+  if (profile) {
+    const profileData = profile as Profile;
     const meta = user.user_metadata || {};
-    const firstName = meta.first_name || meta.full_name?.split(" ")[0] || user.email?.split("@")[0] || "User";
-    const lastName = meta.last_name || (meta.full_name ? meta.full_name.split(" ").slice(1).join(" ") : null);
-    const role = (meta.role as Profile["role"]) || "SUPER_ADMIN";
-    const clientId = meta.client_id || null;
-    const avatarUrl = meta.avatar_url || null;
+    const clientId = profileData.client_id || meta.client_id || null;
 
     return {
-      id: user.id,
-      email: user.email || "",
-      first_name: firstName,
-      last_name: lastName,
-      role: role,
+      ...profileData,
       client_id: clientId,
-      avatar_url: avatarUrl,
-      created_at: user.created_at,
-      updated_at: user.updated_at || user.created_at,
     };
   }
 
-  const profileData = profile as Profile;
+  // Fallback to auth metadata if profile row does not exist
   const meta = user.user_metadata || {};
-  const clientId = profileData.client_id || meta.client_id || null;
+  const firstName = meta.first_name || meta.full_name?.split(" ")[0] || user.email?.split("@")[0] || "User";
+  const lastName = meta.last_name || (meta.full_name ? meta.full_name.split(" ").slice(1).join(" ") : null);
+  const role = (meta.role as Profile["role"]) || "CLIENT"; // Default to CLIENT for safety
+  const clientId = meta.client_id || null;
+  const avatarUrl = meta.avatar_url || null;
 
   return {
-    ...profileData,
+    id: user.id,
+    email: user.email || "",
+    first_name: firstName,
+    last_name: lastName,
+    role: role,
     client_id: clientId,
+    avatar_url: avatarUrl,
+    created_at: user.created_at,
+    updated_at: user.updated_at || user.created_at,
   };
 }

@@ -1,6 +1,12 @@
 import type { Client, ClientStatus } from "@/lib/supabase/types";
+import type { TeamMember } from "@/modules/team/types";
 
 export type { Client, ClientStatus };
+
+export interface ClientWithPm extends Client {
+  project_manager_id?: string | null;
+  project_manager?: TeamMember | null;
+}
 
 export interface ClientFilters {
   query?: string;

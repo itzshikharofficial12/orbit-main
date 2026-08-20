@@ -3,11 +3,13 @@ import { getAuthenticatedProfile } from "@/lib/supabase/server";
 import { OrbitShell } from "@/components/layout/orbit-shell";
 import { getProjectById } from "@/modules/projects/data";
 import { getDeliverablesByProjectId } from "@/modules/deliverables/data";
+import { getProjectBillingOverview } from "@/modules/payments/data";
 import { ProjectDetailHeader } from "@/modules/projects/components/project-detail-header";
 import { ProjectOverviewTab } from "@/modules/projects/components/project-overview-tab";
 import { ProjectMilestonesTab } from "@/modules/projects/components/project-milestones-tab";
 import { ProjectTasksTab } from "@/modules/projects/components/project-tasks-tab";
 import { ProjectDeliverablesTab } from "@/modules/deliverables/components/project-deliverables-tab";
+import { ProjectBillingTab } from "@/modules/projects/components/project-billing-tab";
 
 interface PageProps {
   params: Promise<{ projectId: string }>;
@@ -49,22 +51,25 @@ export default async function HQProjectDetailPage({
     redirect("/client");
   }
 
-  const [project, deliverables] = await Promise.all([
+  const [project, deliverables, billingOverview] = await Promise.all([
     getProjectById(projectId),
     getDeliverablesByProjectId(projectId),
+    getProjectBillingOverview(projectId),
   ]);
 
   if (!project) {
     notFound();
   }
 
-  const activeTab: "overview" | "milestones" | "tasks" | "deliverables" =
+  const activeTab: "overview" | "milestones" | "tasks" | "deliverables" | "billing" =
     tab === "milestones"
       ? "milestones"
       : tab === "tasks"
       ? "tasks"
       : tab === "deliverables"
       ? "deliverables"
+      : tab === "billing"
+      ? "billing"
       : "overview";
 
   const totalTasks = project.milestones.reduce(
@@ -111,6 +116,13 @@ export default async function HQProjectDetailPage({
               projectId={project.id}
               deliverables={deliverables}
               milestones={project.milestones}
+            />
+          )}
+
+          {activeTab === "billing" && (
+            <ProjectBillingTab
+              project={project}
+              billingOverview={billingOverview}
             />
           )}
         </div>

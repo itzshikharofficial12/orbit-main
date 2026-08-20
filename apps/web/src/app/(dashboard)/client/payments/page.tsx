@@ -32,14 +32,27 @@ export default async function ClientPaymentsPage() {
         getPaymentsForClient(profile.client_id),
         getPaymentOverviewMetrics(profile.client_id),
       ])
-    : [[], [], { outstanding: 0, collected: 0, overdue: 0, upcoming: 0, currency: "INR" }];
+    : [
+        [],
+        [],
+        {
+          totalContractValue: 0,
+          collected: 0,
+          outstanding: 0,
+          overdue: 0,
+          dueThisMonth: 0,
+          upcoming: 0,
+          pendingVerificationCount: 0,
+          currency: "INR",
+        },
+      ];
 
   return (
     <OrbitShell
       profile={profile}
       basePath="/client"
       title="Payments"
-      description="View expected billing schedules, remaining balances, and verified receipts."
+      description="View your billing schedule, upcoming payments, and payment history."
     >
       <ClientPaymentsView
         plans={plans}

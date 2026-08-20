@@ -1,11 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { Bell, CheckCheck, Inbox } from "lucide-react";
+import Link from "next/link";
+import { Bell, CheckCheck, Inbox, ArrowRight } from "lucide-react";
 import { useNotifications } from "../hooks/use-notifications";
 import { NotificationItem } from "./notification-item";
 import { NotificationSoundToggle } from "./notification-sound-toggle";
 import { Button } from "@/components/ui/button";
+import { parseNotificationDetails } from "../utils";
 
 export function NotificationCenter() {
   const [isOpen, setIsOpen] = React.useState<boolean>(false);
@@ -59,6 +61,26 @@ export function NotificationCenter() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
+  // Partition notifications into Action Required (urgent/action required unread) and Recent
+  const { actionRequiredItems, standardItems } = React.useMemo(() => {
+    const actionRequired: typeof notifications = [];
+    const standard: typeof notifications = [];
+
+    notifications.forEach((item) => {
+      const details = parseNotificationDetails(item);
+      if (!item.is_read && (details.priority === "URGENT" || details.priority === "ACTION_REQUIRED")) {
+        actionRequired.push(item);
+      } else {
+        standard.push(item);
+      }
+    });
+
+    return {
+      actionRequiredItems: actionRequired,
+      standardItems: standard,
+    };
+  }, [notifications]);
+
   return (
     <div className="relative inline-block" ref={containerRef}>
       {/* Bell Trigger Button */}
@@ -83,7 +105,7 @@ export function NotificationCenter() {
         <div
           role="dialog"
           aria-modal="false"
-          className="absolute right-0 mt-2 w-80 sm:w-96 rounded-xl border border-border/80 bg-card shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[480px]"
+          className="absolute right-0 mt-2 w-80 sm:w-[380px] rounded-xl border border-border/80 bg-card shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-150 overflow-hidden flex flex-col max-h-[520px]"
         >
           {/* Header */}
           <div className="p-3.5 px-4 border-b border-border/40 flex items-center justify-between bg-secondary/30">
@@ -92,8 +114,8 @@ export function NotificationCenter() {
                 Notifications
               </h3>
               {unreadCount > 0 && (
-                <span className="text-[11px] font-mono text-muted-foreground">
-                  ({unreadCount} unread)
+                <span className="text-[10px] font-mono font-semibold px-1.5 py-0.2 rounded bg-primary/15 text-primary">
+                  {unreadCount} unread
                 </span>
               )}
             </div>
@@ -112,38 +134,83 @@ export function NotificationCenter() {
                   className="h-7 text-[11px] px-2 text-muted-foreground hover:text-foreground cursor-pointer gap-1"
                 >
                   <CheckCheck className="h-3 w-3" />
-                  <span>Mark all as read</span>
+                  <span>Mark all read</span>
                 </Button>
               )}
             </div>
           </div>
 
           {/* Notification List Body */}
-          <div className="overflow-y-auto p-2 space-y-1 divide-y divide-border/20 flex-1">
+          <div className="overflow-y-auto p-2 space-y-2.5 flex-1 divide-y divide-border/20">
             {notifications.length === 0 ? (
-              <div className="py-10 px-4 text-center flex flex-col items-center justify-center space-y-2">
+              <div className="py-12 px-4 text-center flex flex-col items-center justify-center space-y-2">
                 <div className="h-8 w-8 rounded-full bg-secondary/60 flex items-center justify-center text-muted-foreground border border-border/40">
                   <Inbox className="h-4 w-4" />
                 </div>
                 <div className="space-y-0.5">
                   <p className="text-xs font-medium text-foreground">
-                    No new notifications
+                    You&apos;re all caught up
                   </p>
                   <p className="text-[11px] text-muted-foreground">
-                    You are all caught up.
+                    No new updates from your workspace.
                   </p>
                 </div>
               </div>
             ) : (
-              notifications.map((notification) => (
-                <NotificationItem
-                  key={notification.id}
-                  notification={notification}
-                  onMarkAsRead={markAsRead}
-                  onClosePopover={() => setIsOpen(false)}
-                />
-              ))
+              <>
+                {/* 1. Action Required Section */}
+                {actionRequiredItems.length > 0 && (
+                  <div className="space-y-1 pt-1 first:pt-0">
+                    <span className="text-[10px] font-mono uppercase tracking-wider text-primary font-semibold block px-2 mb-1">
+                      Action Required ({actionRequiredItems.length})
+                    </span>
+                    {actionRequiredItems.map((notification) => (
+                      <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        onMarkAsRead={markAsRead}
+                        onClosePopover={() => setIsOpen(false)}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* 2. Standard / Recent Section */}
+                {standardItems.length > 0 && (
+                  <div className="space-y-1 pt-2 first:pt-0">
+                    {actionRequiredItems.length > 0 && (
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold block px-2 mb-1">
+                        Updates
+                      </span>
+                    )}
+                    {standardItems.slice(0, 8).map((notification) => (
+                      <NotificationItem
+                        key={notification.id}
+                        notification={notification}
+                        onMarkAsRead={markAsRead}
+                        onClosePopover={() => setIsOpen(false)}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
+          </div>
+
+          {/* Footer */}
+          <div className="p-2 px-3 border-t border-border/40 bg-secondary/20 flex items-center justify-between">
+            <Link
+              href="/client/notifications"
+              onClick={() => setIsOpen(false)}
+              className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition-colors font-medium"
+            >
+              <span>View all notifications</span>
+              <ArrowRight className="h-3 w-3" />
+            </Link>
+
+            <span className="text-[10px] font-mono text-muted-foreground/60">
+              Orbit Action Center
+            </span>
           </div>
         </div>
       )}

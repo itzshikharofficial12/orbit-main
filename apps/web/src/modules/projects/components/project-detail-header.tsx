@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, Building2, Calendar, Target, LayoutGrid, Flag, CheckSquare, Package } from "lucide-react";
+import { ArrowLeft, Building2, Calendar, Target, LayoutGrid, Flag, CheckSquare, Package, CreditCard } from "lucide-react";
 import { ProjectStatusBadge } from "./project-status-badge";
 import { ServiceTypeBadge } from "./service-type-badge";
 import { EditProjectDialog } from "./edit-project-dialog";
@@ -12,10 +12,11 @@ import { cn } from "@/lib/utils";
 
 interface ProjectDetailHeaderProps {
   project: ProjectWithClient;
-  activeTab?: "overview" | "milestones" | "tasks" | "deliverables";
+  activeTab?: "overview" | "milestones" | "tasks" | "deliverables" | "billing";
   milestoneCount?: number;
   taskCount?: number;
   deliverableCount?: number;
+  billingCount?: number;
 }
 
 export function ProjectDetailHeader({
@@ -24,6 +25,7 @@ export function ProjectDetailHeader({
   milestoneCount,
   taskCount,
   deliverableCount,
+  billingCount,
 }: ProjectDetailHeaderProps) {
   const [currentStatus, setCurrentStatus] = React.useState<ProjectStatus>(project.status);
   const [isUpdating, setIsUpdating] = React.useState(false);
@@ -86,6 +88,12 @@ export function ProjectDetailHeader({
       href: `/hq/projects/${project.id}?tab=deliverables`,
       icon: Package,
       badge: deliverableCount,
+    },
+    {
+      id: "billing",
+      label: "Billing & Invoices",
+      href: `/hq/projects/${project.id}?tab=billing`,
+      icon: CreditCard,
     },
   ];
 

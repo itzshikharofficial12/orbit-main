@@ -118,3 +118,30 @@ export async function getRecentDeliverablesForClient(
     return [];
   }
 }
+
+export async function getPendingReviewDeliverablesForAdmin(): Promise<
+  Array<DeliverableWithMilestone & { project?: { id: string; name: string } }>
+> {
+  if (!env.isConfigured()) return [];
+
+  try {
+    const supabase = await createServerClient();
+    const { data, error } = await supabase
+      .from("deliverables")
+      .select("*, milestone:milestones(id, name), project:projects(id, name)")
+      .eq("status", "READY_FOR_REVIEW")
+      .order("created_at", { ascending: false })
+      .limit(5);
+
+    if (error) {
+      console.warn("Notice fetching admin review deliverables:", error.message || error);
+      return [];
+    }
+
+    return (data as any[]) || [];
+  } catch (err) {
+    console.warn("Unexpected error in getPendingReviewDeliverablesForAdmin:", err);
+    return [];
+  }
+}
+

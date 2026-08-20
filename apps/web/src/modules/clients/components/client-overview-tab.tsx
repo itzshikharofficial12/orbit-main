@@ -15,20 +15,24 @@ import { ProjectStatusBadge } from "@/modules/projects/components/project-status
 import { ServiceTypeBadge } from "@/modules/projects/components/service-type-badge";
 import { ProjectProgressBar } from "@/modules/projects/components/project-progress-bar";
 import { PortalAccessCard } from "./portal-access-card";
-import type { Client } from "../types";
+import { ClientPmCard } from "@/modules/team/components/client-pm-card";
+import type { ClientWithPm } from "../types";
 import type { ProjectWithClient } from "@/modules/projects/types";
 import type { Profile } from "@/lib/supabase/types";
+import type { TeamMember } from "@/modules/team/types";
 
 interface ClientOverviewTabProps {
-  client: Client;
+  client: ClientWithPm;
   projects?: ProjectWithClient[];
   portalUsers?: Profile[];
+  projectManagers?: TeamMember[];
 }
 
 export function ClientOverviewTab({
   client,
   projects = [],
   portalUsers = [],
+  projectManagers = [],
 }: ClientOverviewTabProps) {
   function formatDate(iso: string | null) {
     if (!iso) return "Not specified";
@@ -48,10 +52,18 @@ export function ClientOverviewTab({
 
   return (
     <div className="space-y-8">
-      {/* Grid: Client Contact & Account Information */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Grid: Project Manager & Client Contact */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Primary Project Manager Card */}
+        <ClientPmCard
+          clientId={client.id}
+          clientName={client.name}
+          currentPm={client.project_manager || null}
+          projectManagers={projectManagers}
+        />
+
         {/* Primary Contact Details */}
-        <Card className="border-border/70 bg-card">
+        <Card className="border-border/70 bg-card shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-base font-semibold">Primary Contact</CardTitle>
             <CardDescription className="text-xs">
@@ -97,9 +109,11 @@ export function ClientOverviewTab({
             </div>
           </CardContent>
         </Card>
+      </div>
 
-        {/* Account Details & Metadata */}
-        <Card className="border-border/70 bg-card">
+      {/* Account Details & Metadata */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <Card className="border-border/70 bg-card shadow-sm">
           <CardHeader className="pb-4">
             <CardTitle className="text-base font-semibold">Account Metadata</CardTitle>
             <CardDescription className="text-xs">
@@ -128,10 +142,10 @@ export function ClientOverviewTab({
             </div>
           </CardContent>
         </Card>
-      </div>
 
-      {/* Portal Access Management */}
-      <PortalAccessCard client={client} portalUsers={portalUsers} />
+        {/* Portal Access Management */}
+        <PortalAccessCard client={client} portalUsers={portalUsers} />
+      </div>
 
       {/* Notes section if present */}
       {client.notes && (

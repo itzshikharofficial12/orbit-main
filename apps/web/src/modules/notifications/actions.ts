@@ -46,7 +46,6 @@ export async function markNotificationAsReadAction(
       .from("notifications")
       .update({
         is_read: true,
-        updated_at: new Date().toISOString(),
       } as never)
       .eq("id", notificationId);
 
@@ -97,7 +96,6 @@ export async function markAllNotificationsAsReadAction(): Promise<NotificationAc
       .from("notifications")
       .update({
         is_read: true,
-        updated_at: new Date().toISOString(),
       } as never)
       .eq("recipient_id", profile.id)
       .eq("is_read", false);

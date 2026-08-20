@@ -72,11 +72,97 @@ export interface PaymentWithRelations extends Payment {
 }
 
 export interface PaymentOverviewMetrics {
-  outstanding: number;
+  totalContractValue: number;
   collected: number;
+  outstanding: number;
   overdue: number;
+  dueThisMonth: number;
   upcoming: number;
+  pendingVerificationCount: number;
   currency: string;
+}
+
+export interface OverdueScheduleItem {
+  id: string;
+  title: string;
+  amount: number;
+  currency: string;
+  due_date: string;
+  daysOverdue: number;
+  remainingAmount: number;
+  paidAmount: number;
+  status: BillingScheduleStatus;
+  client: {
+    id: string;
+    name: string;
+    primary_contact_name?: string | null;
+    primary_contact_email?: string | null;
+  };
+  project?: {
+    id: string;
+    name: string;
+  } | null;
+  billing_plan: {
+    id: string;
+    name: string;
+    billing_type: BillingType;
+  };
+}
+
+export interface UpcomingScheduleItem {
+  id: string;
+  title: string;
+  amount: number;
+  currency: string;
+  due_date: string | null;
+  remainingAmount: number;
+  paidAmount: number;
+  status: BillingScheduleStatus;
+  client: {
+    id: string;
+    name: string;
+  };
+  project?: {
+    id: string;
+    name: string;
+  } | null;
+  billing_plan: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface PendingBankTransfer {
+  id: string;
+  amount: number;
+  currency: string;
+  transaction_reference: string | null;
+  paid_at: string | null;
+  created_at: string;
+  notes: string | null;
+  status: PaymentStatus;
+  client: {
+    id: string;
+    name: string;
+    primary_contact_name?: string | null;
+    primary_contact_email?: string | null;
+    primary_contact_phone?: string | null;
+  };
+  project?: {
+    id: string;
+    name: string;
+  } | null;
+  schedule_item?: {
+    id: string;
+    title: string;
+    amount: number;
+    due_date: string | null;
+    invoice_number?: string | null;
+  } | null;
+  billing_plan?: {
+    id: string;
+    name: string;
+  } | null;
 }
 
 export interface BillingPlanFilterParams {

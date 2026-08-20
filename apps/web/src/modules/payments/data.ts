@@ -1,4 +1,7 @@
 import { createServerClient } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/types";
 import type {
   BillingPlanWithRelations,
   BillingScheduleItemWithRelations,
@@ -9,6 +12,18 @@ import type {
 } from "./types";
 import { calculateScheduleStatus } from "./utils";
 import { env } from "@/lib/env";
+
+async function getPaymentReadClient(): Promise<SupabaseClient<Database>> {
+  const admin = getAdminClient();
+  if (admin) return admin as unknown as SupabaseClient<Database>;
+
+  try {
+    return (await createServerClient()) as unknown as SupabaseClient<Database>;
+  } catch {
+    const { createClient } = await import("@supabase/supabase-js");
+    return createClient<Database>(env.supabaseUrl, env.supabaseAnonKey);
+  }
+}
 
 function isMissingTable(err: unknown): boolean {
   if (!err || typeof err !== "object") return false;
@@ -29,7 +44,7 @@ export async function getBillingPlansForAdmin(
   if (!env.isConfigured()) return [];
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getPaymentReadClient();
 
     let query = supabase
       .from("billing_plans")
@@ -140,7 +155,7 @@ export async function getBillingPlansForClient(
   if (!env.isConfigured() || !clientId) return [];
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getPaymentReadClient();
 
     const { data, error } = await supabase
       .from("billing_plans")
@@ -214,6 +229,63 @@ export async function getBillingPlansForClient(
   }
 }
 
+export async function getBillingPlansForProject(
+  projectId: string
+): Promise<BillingPlanWithRelations[]> {
+  if (!env.isConfigured() || !projectId) return [];
+
+  try {
+    const supabase = await getPaymentReadClient();
+
+    const { data, error } = await supabase
+      .from("billing_plans")
+      .select(`
+        *,
+        client:clients(id, name, status, primary_contact_name, primary_contact_email),
+        project:projects(id, name, status, service_type),
+        schedule_items:billing_schedule_items(
+          *,
+          milestone:milestones(id, name, status),
+          payments(*)
+        )
+      `)
+      .eq("project_id", projectId)
+      .order("created_at", { ascending: false });
+
+    if (error || !data) return [];
+
+    return (data as any[]).map((plan) => {
+      let totalCollected = 0;
+      let totalOutstanding = 0;
+
+      const scheduleItems = (plan.schedule_items || []).map((item: any) => {
+        const paidPayments = (item.payments || []).filter((p: any) => p.status === "PAID");
+        const paidAmount = paidPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+        const remainingAmount = Math.max(0, Number(item.amount) - paidAmount);
+
+        totalCollected += paidAmount;
+        totalOutstanding += remainingAmount;
+
+        return {
+          ...item,
+          paid_amount: paidAmount,
+          remaining_amount: remainingAmount,
+        };
+      });
+
+      return {
+        ...plan,
+        schedule_items: scheduleItems,
+        total_collected: totalCollected,
+        total_outstanding: totalOutstanding,
+      };
+    });
+  } catch (err) {
+    console.warn("Notice: Error in getBillingPlansForProject:", err);
+    return [];
+  }
+}
+
 export async function getPaymentsForAdmin(filters?: {
   clientId?: string;
   projectId?: string;
@@ -221,7 +293,7 @@ export async function getPaymentsForAdmin(filters?: {
   if (!env.isConfigured()) return [];
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getPaymentReadClient();
 
     let query = supabase
       .from("payments")
@@ -265,7 +337,7 @@ export async function getPaymentsForClient(
   if (!env.isConfigured() || !clientId) return [];
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getPaymentReadClient();
 
     const { data, error } = await supabase
       .from("payments")
@@ -297,21 +369,37 @@ export async function getPaymentOverviewMetrics(
   clientId?: string
 ): Promise<PaymentOverviewMetrics> {
   const fallback: PaymentOverviewMetrics = {
-    outstanding: 0,
+    totalContractValue: 0,
     collected: 0,
+    outstanding: 0,
     overdue: 0,
+    dueThisMonth: 0,
     upcoming: 0,
+    pendingVerificationCount: 0,
     currency: "INR",
   };
 
   if (!env.isConfigured()) return fallback;
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getPaymentReadClient();
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    // 1. Fetch schedule items with their payments
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+
+    // 1. Fetch total contract value from billing plans
+    let plansQuery = supabase.from("billing_plans").select("total_contract_value, status");
+    if (clientId) {
+      plansQuery = plansQuery.eq("client_id", clientId);
+    }
+    const { data: plansData } = await plansQuery;
+    const totalContractValue = ((plansData as any[]) || [])
+      .filter((p) => p.status !== "CANCELLED")
+      .reduce((acc: number, p: any) => acc + (Number(p.total_contract_value) || 0), 0);
+
+    // 2. Fetch schedule items with their payments
     let scheduleQuery = supabase.from("billing_schedule_items").select(`
       id,
       amount,
@@ -327,12 +415,13 @@ export async function getPaymentOverviewMetrics(
     const { data: scheduleData, error: schedErr } = await scheduleQuery;
 
     if (schedErr || !scheduleData) {
-      return fallback;
+      return { ...fallback, totalContractValue };
     }
 
-    let totalOutstanding = 0;
     let totalCollected = 0;
+    let totalOutstanding = 0;
     let totalOverdue = 0;
+    let totalDueThisMonth = 0;
     let totalUpcoming = 0;
 
     for (const item of scheduleData as Array<{
@@ -359,24 +448,215 @@ export async function getPaymentOverviewMetrics(
           } else {
             totalUpcoming += remaining;
           }
+
+          if (dueDate.getFullYear() === currentYear && dueDate.getMonth() === currentMonth) {
+            totalDueThisMonth += remaining;
+          }
         } else {
           totalUpcoming += remaining;
         }
       }
     }
 
+    // 3. Count pending verification bank transfers
+    let pendingPaymentsQuery = supabase
+      .from("payments")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "PENDING")
+      .eq("method", "BANK_TRANSFER");
+
+    if (clientId) {
+      pendingPaymentsQuery = pendingPaymentsQuery.eq("client_id", clientId);
+    }
+    const { count: pendingCount } = await pendingPaymentsQuery;
+
     return {
-      outstanding: totalOutstanding,
+      totalContractValue: totalContractValue > 0 ? totalContractValue : (totalCollected + totalOutstanding),
       collected: totalCollected,
+      outstanding: totalOutstanding,
       overdue: totalOverdue,
+      dueThisMonth: totalDueThisMonth,
       upcoming: totalUpcoming,
+      pendingVerificationCount: pendingCount || 0,
       currency: "INR",
     };
   } catch (err) {
-    if (!isMissingTable(err)) {
-      console.warn("Notice: Unexpected error in getPaymentOverviewMetrics:", err);
-    }
+    console.warn("Notice: Unexpected error in getPaymentOverviewMetrics:", err);
     return fallback;
+  }
+}
+
+/**
+ * Fetches all bank transfers awaiting admin verification (status = PENDING)
+ */
+export async function getPendingBankTransfers(): Promise<import("./types").PendingBankTransfer[]> {
+  if (!env.isConfigured()) return [];
+
+  try {
+    const supabase = await getPaymentReadClient();
+
+    const { data, error } = await supabase
+      .from("payments")
+      .select(`
+        id,
+        amount,
+        currency,
+        transaction_reference,
+        paid_at,
+        created_at,
+        notes,
+        status,
+        client:clients(id, name, primary_contact_name, primary_contact_email, primary_contact_phone),
+        project:projects(id, name),
+        schedule_item:billing_schedule_items(id, title, amount, due_date, billing_plan_id)
+      `)
+      .eq("method", "BANK_TRANSFER")
+      .eq("status", "PENDING")
+      .order("created_at", { ascending: false });
+
+    if (error || !data) {
+      return [];
+    }
+
+    return data as unknown as import("./types").PendingBankTransfer[];
+  } catch (err) {
+    console.warn("Notice: Error in getPendingBankTransfers:", err);
+    return [];
+  }
+}
+
+/**
+ * Fetches all overdue billing schedule items with calculated daysOverdue
+ */
+export async function getOverdueScheduleItems(): Promise<import("./types").OverdueScheduleItem[]> {
+  if (!env.isConfigured()) return [];
+
+  try {
+    const supabase = await getPaymentReadClient();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from("billing_schedule_items")
+      .select(`
+        id,
+        title,
+        amount,
+        currency,
+        due_date,
+        status,
+        client:clients(id, name, primary_contact_name, primary_contact_email),
+        project:projects(id, name),
+        billing_plan:billing_plans(id, name, billing_type),
+        payments(id, amount, status)
+      `)
+      .lt("due_date", today.toISOString().split("T")[0])
+      .order("due_date", { ascending: true });
+
+    if (error || !data) {
+      return [];
+    }
+
+    const overdueList: import("./types").OverdueScheduleItem[] = [];
+
+    for (const item of data as any[]) {
+      const paidPayments = (item.payments || []).filter((p: any) => p.status === "PAID");
+      const paidAmount = paidPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+      const remainingAmount = Math.max(0, Number(item.amount) - paidAmount);
+
+      if (remainingAmount > 0 && item.status !== "PAID" && item.status !== "WAIVED" && item.status !== "CANCELLED") {
+        const dueDate = new Date(item.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+        const diffTime = Math.abs(today.getTime() - dueDate.getTime());
+        const daysOverdue = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        overdueList.push({
+          id: item.id,
+          title: item.title,
+          amount: Number(item.amount),
+          currency: item.currency || "INR",
+          due_date: item.due_date,
+          daysOverdue,
+          remainingAmount,
+          paidAmount,
+          status: item.status,
+          client: item.client || { id: "", name: "Client" },
+          project: item.project || null,
+          billing_plan: item.billing_plan || { id: "", name: "Plan", billing_type: "ONE_TIME" },
+        });
+      }
+    }
+
+    return overdueList;
+  } catch (err) {
+    console.warn("Notice: Error in getOverdueScheduleItems:", err);
+    return [];
+  }
+}
+
+/**
+ * Fetches upcoming collections ordered by due date
+ */
+export async function getUpcomingScheduleItems(
+  limit: number = 20
+): Promise<import("./types").UpcomingScheduleItem[]> {
+  if (!env.isConfigured()) return [];
+
+  try {
+    const supabase = await getPaymentReadClient();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const { data, error } = await supabase
+      .from("billing_schedule_items")
+      .select(`
+        id,
+        title,
+        amount,
+        currency,
+        due_date,
+        status,
+        client:clients(id, name),
+        project:projects(id, name),
+        billing_plan:billing_plans(id, name),
+        payments(id, amount, status)
+      `)
+      .gte("due_date", today.toISOString().split("T")[0])
+      .order("due_date", { ascending: true })
+      .limit(limit);
+
+    if (error || !data) {
+      return [];
+    }
+
+    const upcomingList: import("./types").UpcomingScheduleItem[] = [];
+
+    for (const item of data as any[]) {
+      const paidPayments = (item.payments || []).filter((p: any) => p.status === "PAID");
+      const paidAmount = paidPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
+      const remainingAmount = Math.max(0, Number(item.amount) - paidAmount);
+
+      if (remainingAmount > 0 && item.status !== "PAID" && item.status !== "WAIVED" && item.status !== "CANCELLED") {
+        upcomingList.push({
+          id: item.id,
+          title: item.title,
+          amount: Number(item.amount),
+          currency: item.currency || "INR",
+          due_date: item.due_date,
+          remainingAmount,
+          paidAmount,
+          status: item.status,
+          client: item.client || { id: "", name: "Client" },
+          project: item.project || null,
+          billing_plan: item.billing_plan || { id: "", name: "Plan" },
+        });
+      }
+    }
+
+    return upcomingList;
+  } catch (err) {
+    console.warn("Notice: Error in getUpcomingScheduleItems:", err);
+    return [];
   }
 }
 
@@ -386,7 +666,7 @@ export async function getBillingPlanById(
   if (!env.isConfigured() || !planId) return null;
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getPaymentReadClient();
 
     const { data, error } = await supabase
       .from("billing_plans")
@@ -444,7 +724,7 @@ export async function getInvoiceById(
   if (!env.isConfigured() || !invoiceIdOrNumber) return null;
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getPaymentReadClient();
 
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       invoiceIdOrNumber
@@ -528,7 +808,7 @@ export async function getReceiptById(
   if (!env.isConfigured() || !paymentIdOrReceiptNumber) return null;
 
   try {
-    const supabase = await createServerClient();
+    const supabase = await getPaymentReadClient();
 
     const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
       paymentIdOrReceiptNumber
@@ -581,5 +861,71 @@ export async function getReceiptById(
     console.error("Error in getReceiptById:", err);
     return null;
   }
+}
+
+export async function getClientBillingOverview(clientId: string) {
+  const [metrics, plans, payments] = await Promise.all([
+    getPaymentOverviewMetrics(clientId),
+    getBillingPlansForClient(clientId),
+    getPaymentsForClient(clientId),
+  ]);
+
+  return {
+    metrics,
+    plans,
+    payments,
+  };
+}
+
+export async function getProjectBillingOverview(projectId: string) {
+  const [plans, payments] = await Promise.all([
+    getBillingPlansForProject(projectId),
+    getPaymentsForAdmin({ projectId }),
+  ]);
+
+  let projectValue = 0;
+  let totalCollected = 0;
+  let totalOutstanding = 0;
+  let nextDueItem: any = null;
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  for (const plan of plans) {
+    if (plan.status !== "CANCELLED") {
+      projectValue += Number(plan.total_contract_value) || 0;
+    }
+
+    for (const item of plan.schedule_items || []) {
+      const paidAmount = item.paid_amount || 0;
+      totalCollected += paidAmount;
+      const remaining = Math.max(0, Number(item.amount) - paidAmount);
+      totalOutstanding += remaining;
+
+      if (remaining > 0 && item.due_date) {
+        const dueDate = new Date(item.due_date);
+        dueDate.setHours(0, 0, 0, 0);
+        if (!nextDueItem || dueDate < new Date(nextDueItem.due_date)) {
+          nextDueItem = {
+            id: item.id,
+            title: item.title,
+            amount: remaining,
+            due_date: item.due_date,
+            status: item.status,
+            planName: plan.name,
+          };
+        }
+      }
+    }
+  }
+
+  return {
+    projectValue,
+    totalCollected,
+    totalOutstanding,
+    nextDueItem,
+    plans,
+    payments,
+  };
 }
 

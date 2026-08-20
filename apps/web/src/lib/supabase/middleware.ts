@@ -61,18 +61,34 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Authenticated user attempting to access /login
-  if (user && isAuthRoute && !path.startsWith("/api/auth")) {
-    const role = user.user_metadata?.role || "SUPER_ADMIN";
-    const targetPath = role === "CLIENT" ? "/client" : "/hq";
-    return NextResponse.redirect(new URL(targetPath, request.url));
-  }
+  if (user) {
+    // Resolve role from metadata or query database profile
+    let role = user.user_metadata?.role || (user.app_metadata?.role as string);
 
-  // Prevent CLIENT role from accessing /hq
-  if (user && isHqRoute) {
-    const role = user.user_metadata?.role;
-    if (role === "CLIENT") {
+    if (!role) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .maybeSingle();
+
+      role = (profile as { role?: string } | null)?.role || "CLIENT";
+    }
+
+    // Authenticated user attempting to access /login
+    if (isAuthRoute && !path.startsWith("/api/auth")) {
+      const targetPath = role === "CLIENT" ? "/client" : "/hq";
+      return NextResponse.redirect(new URL(targetPath, request.url));
+    }
+
+    // Prevent CLIENT role from accessing /hq or any /hq/* route
+    if (isHqRoute && role === "CLIENT") {
       return NextResponse.redirect(new URL("/client", request.url));
+    }
+
+    // Prevent SUPER_ADMIN role from accessing /client
+    if (isClientRoute && role === "SUPER_ADMIN") {
+      return NextResponse.redirect(new URL("/hq", request.url));
     }
   }
 

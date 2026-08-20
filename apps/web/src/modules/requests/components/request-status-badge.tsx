@@ -1,10 +1,10 @@
 import * as React from "react";
-import { CircleDot, Clock, CheckCircle2, XCircle } from "lucide-react";
+import { CircleDot, Clock, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { ClientRequestStatus } from "../types";
+import type { RequestStatus } from "../types";
 
 interface RequestStatusBadgeProps {
-  status: ClientRequestStatus;
+  status: RequestStatus | string;
   className?: string;
 }
 
@@ -14,9 +14,9 @@ export function RequestStatusBadge({ status, className }: RequestStatusBadgeProp
       return (
         <Badge
           variant="outline"
-          className={`border-amber-700/60 bg-amber-950/30 text-amber-300 gap-1 text-[11px] font-medium font-mono ${className || ""}`}
+          className={`border-zinc-700/60 bg-zinc-800/40 text-zinc-300 gap-1 text-[11px] font-medium font-mono ${className || ""}`}
         >
-          <CircleDot className="h-3 w-3 text-amber-400" />
+          <CircleDot className="h-3 w-3 text-zinc-400" />
           <span>Open</span>
         </Badge>
       );
@@ -28,6 +28,16 @@ export function RequestStatusBadge({ status, className }: RequestStatusBadgeProp
         >
           <Clock className="h-3 w-3 text-sky-400" />
           <span>In Progress</span>
+        </Badge>
+      );
+    case "WAITING_FOR_CLIENT":
+      return (
+        <Badge
+          variant="outline"
+          className={`border-amber-700/60 bg-amber-950/40 text-amber-300 gap-1 text-[11px] font-medium font-mono ${className || ""}`}
+        >
+          <HelpCircle className="h-3 w-3 text-amber-400" />
+          <span>Waiting on Client</span>
         </Badge>
       );
     case "RESOLVED":

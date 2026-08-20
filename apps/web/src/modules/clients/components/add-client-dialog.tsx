@@ -10,8 +10,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { createClientSchema, type CreateClientInput } from "../schema";
 import { createClientAction } from "../actions";
 import type { ClientStatus } from "../types";
+import type { TeamMember } from "@/modules/team/types";
 
-export function AddClientDialog() {
+interface AddClientDialogProps {
+  projectManagers?: TeamMember[];
+}
+
+export function AddClientDialog({ projectManagers = [] }: AddClientDialogProps) {
   const router = useRouter();
   const [isOpen, setIsOpen] = React.useState(false);
   const [isLoading, setIsLoading] = React.useState(false);
@@ -24,6 +29,7 @@ export function AddClientDialog() {
     primary_contact_email: "",
     primary_contact_phone: "",
     status: "ACTIVE",
+    project_manager_id: null,
     notes: "",
   });
 
@@ -34,6 +40,7 @@ export function AddClientDialog() {
       primary_contact_email: "",
       primary_contact_phone: "",
       status: "ACTIVE",
+      project_manager_id: null,
       notes: "",
     });
     setErrorMessage(null);
@@ -78,6 +85,9 @@ export function AddClientDialog() {
       payload.append("primary_contact_phone", formData.primary_contact_phone);
     }
     payload.append("status", formData.status);
+    if (formData.project_manager_id) {
+      payload.append("project_manager_id", formData.project_manager_id);
+    }
     if (formData.notes) {
       payload.append("notes", formData.notes);
     }
@@ -248,26 +258,51 @@ export function AddClientDialog() {
                 </div>
               </div>
 
-              {/* Status Selector */}
-              <div className="space-y-1.5">
-                <Label htmlFor="client_status">Engagement Status</Label>
-                <select
-                  id="client_status"
-                  value={formData.status}
-                  onChange={(e) =>
-                    setFormData((prev) => ({
-                      ...prev,
-                      status: e.target.value as ClientStatus,
-                    }))
-                  }
-                  disabled={isLoading}
-                  className="flex h-10 w-full rounded-md border border-input bg-card/60 px-3 py-2 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                >
-                  <option value="ACTIVE">ACTIVE — Ongoing engagements</option>
-                  <option value="PAUSED">PAUSED — Temporarily on hold</option>
-                  <option value="COMPLETED">COMPLETED — Engagement finished</option>
-                  <option value="ARCHIVED">ARCHIVED — Inactive record</option>
-                </select>
+              {/* Status & Project Manager Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="client_status">Engagement Status</Label>
+                  <select
+                    id="client_status"
+                    value={formData.status}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        status: e.target.value as ClientStatus,
+                      }))
+                    }
+                    disabled={isLoading}
+                    className="flex h-10 w-full rounded-md border border-input bg-card/60 px-3 py-2 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="ACTIVE">ACTIVE — Ongoing engagements</option>
+                    <option value="PAUSED">PAUSED — Temporarily on hold</option>
+                    <option value="COMPLETED">COMPLETED — Engagement finished</option>
+                    <option value="ARCHIVED">ARCHIVED — Inactive record</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="client_pm">Primary Project Manager</Label>
+                  <select
+                    id="client_pm"
+                    value={formData.project_manager_id || ""}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        project_manager_id: e.target.value || null,
+                      }))
+                    }
+                    disabled={isLoading}
+                    className="flex h-10 w-full rounded-md border border-input bg-card/60 px-3 py-2 text-sm text-foreground shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                  >
+                    <option value="">-- Assign Later --</option>
+                    {projectManagers.map((pm) => (
+                      <option key={pm.id} value={pm.id}>
+                        {pm.first_name} {pm.last_name || ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Actions Footer */}

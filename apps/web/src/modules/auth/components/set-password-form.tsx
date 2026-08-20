@@ -14,9 +14,15 @@ import { setPasswordSchema, type SetPasswordInput } from "../schema";
 
 interface SetPasswordFormProps {
   initialEmail?: string;
+  initialError?: string;
+  initialErrorDescription?: string;
 }
 
-export function SetPasswordForm({ initialEmail }: SetPasswordFormProps) {
+export function SetPasswordForm({
+  initialEmail,
+  initialError,
+  initialErrorDescription,
+}: SetPasswordFormProps) {
   const router = useRouter();
   const [formData, setFormData] = React.useState<SetPasswordInput>({
     password: "",
@@ -26,6 +32,7 @@ export function SetPasswordForm({ initialEmail }: SetPasswordFormProps) {
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
+  // Always start with verification to allow parsing URL hash tokens before showing any error
   const [isVerifyingSession, setIsVerifyingSession] = React.useState(true);
   const [sessionError, setSessionError] = React.useState<string | null>(null);
   const [userEmail, setUserEmail] = React.useState<string | null>(initialEmail || null);
@@ -34,103 +41,158 @@ export function SetPasswordForm({ initialEmail }: SetPasswordFormProps) {
     let isMounted = true;
     const supabase = createBrowserClient();
 
-    // 1. Check for errors in URL search params or URL hash
-    const url = new URL(window.location.href);
-    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const searchParams = url.searchParams;
-
-    const errorParam = searchParams.get("error") || hashParams.get("error");
-    const errorCode = searchParams.get("error_code") || hashParams.get("error_code");
-    const errorDesc = searchParams.get("error_description") || hashParams.get("error_description");
-
-    if (errorParam || errorCode) {
-      if (errorCode === "otp_expired" || errorParam === "invalid_or_expired_invitation") {
-        setSessionError(
-          "This invitation link has expired or has already been used. Please contact Celestia Studios to request a fresh invitation."
-        );
-      } else {
-        setSessionError(
-          errorDesc?.replace(/\+/g, " ") || "The invitation or recovery link is invalid. Please request a new link."
-        );
-      }
-      setIsVerifyingSession(false);
-      return;
-    }
-
-    // 2. Check for active session or listen for token exchange from hash
-    async function checkSession() {
+    async function initializeAndVerifySession() {
       try {
-        const { data: { session }, error } = await supabase.auth.getSession();
+        // 1. Check for URL fragment tokens (#access_token=...&refresh_token=...)
+        const rawHash = typeof window !== "undefined" ? window.location.hash.replace(/^#/, "") : "";
+        const hashParams = new URLSearchParams(rawHash);
+        const hashAccessToken = hashParams.get("access_token");
+        const hashRefreshToken = hashParams.get("refresh_token");
+        const hashError = hashParams.get("error");
+        const hashErrorCode = hashParams.get("error_code");
+        const hashErrorDescription = hashParams.get("error_description");
 
-        if (error) {
+        const url = new URL(window.location.href);
+        const searchParams = url.searchParams;
+        const queryCode = searchParams.get("code");
+        const queryTokenHash = searchParams.get("token_hash");
+        const queryOtpType = searchParams.get("type");
+        const queryError = searchParams.get("error") || initialError;
+        const queryErrorCode = searchParams.get("error_code");
+        const queryErrorDescription = searchParams.get("error_description") || initialErrorDescription;
+
+        // 2. If access_token is present in URL hash, establish Supabase session
+        if (hashAccessToken) {
+          const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
+            access_token: hashAccessToken,
+            refresh_token: hashRefreshToken || "",
+          });
+
+          if (!sessionErr && sessionData.session?.user) {
+            if (isMounted) {
+              setUserEmail(sessionData.session.user.email || null);
+              setSessionError(null);
+              setIsVerifyingSession(false);
+            }
+
+            // Remove sensitive access token fragment and any error query params from address bar
+            try {
+              window.history.replaceState(null, "", window.location.pathname);
+            } catch {
+              // Ignore history state errors in restricted environments
+            }
+            return;
+          }
+        }
+
+        // 3. If PKCE code is present in query parameters
+        if (queryCode) {
+          const { data: codeData, error: codeErr } = await supabase.auth.exchangeCodeForSession(queryCode);
+          if (!codeErr && codeData.session?.user) {
+            if (isMounted) {
+              setUserEmail(codeData.session.user.email || null);
+              setSessionError(null);
+              setIsVerifyingSession(false);
+            }
+            try {
+              window.history.replaceState(null, "", window.location.pathname);
+            } catch {}
+            return;
+          }
+        }
+
+        // 4. If token_hash and type are present in query parameters
+        if (queryTokenHash && queryOtpType) {
+          const { data: otpData, error: otpErr } = await supabase.auth.verifyOtp({
+            token_hash: queryTokenHash,
+            type: queryOtpType as any,
+          });
+          if (!otpErr && otpData.session?.user) {
+            if (isMounted) {
+              setUserEmail(otpData.session.user.email || null);
+              setSessionError(null);
+              setIsVerifyingSession(false);
+            }
+            try {
+              window.history.replaceState(null, "", window.location.pathname);
+            } catch {}
+            return;
+          }
+        }
+
+        // 5. Check existing active Supabase session or authenticated user
+        const { data: { user: currentUser }, error: userErr } = await supabase.auth.getUser();
+        if (!userErr && currentUser) {
           if (isMounted) {
-            setSessionError("Unable to verify invitation session. Please request a new invite.");
+            setUserEmail(currentUser.email || null);
+            setSessionError(null);
             setIsVerifyingSession(false);
+          }
+          if (window.location.hash || window.location.search) {
+            try {
+              window.history.replaceState(null, "", window.location.pathname);
+            } catch {}
           }
           return;
         }
 
-        if (session?.user) {
-          if (isMounted) {
-            setUserEmail(session.user.email || null);
+        // 6. Listen for Supabase onAuthStateChange in case session is hydrating asynchronously
+        let resolved = false;
+        const { data: authListener } = supabase.auth.onAuthStateChange(
+          (event, session) => {
+            if (!isMounted || resolved) return;
+            if (session?.user) {
+              resolved = true;
+              setUserEmail(session.user.email || null);
+              setSessionError(null);
+              setIsVerifyingSession(false);
+              try {
+                window.history.replaceState(null, "", window.location.pathname);
+              } catch {}
+            }
+          }
+        );
+
+        // 7. If no valid session could be established, resolve the error description
+        const explicitError = hashErrorCode || hashError || queryErrorCode || queryError;
+        const explicitDesc = hashErrorDescription || queryErrorDescription;
+
+        let displayError = "This invitation link has expired or has already been used. Please request a fresh invitation from Celestia Studios.";
+        if (explicitError === "access_denied" && explicitDesc?.toLowerCase().includes("expired")) {
+          displayError = "This invitation link has expired or has already been used. Please request a fresh invitation from Celestia Studios.";
+        } else if (explicitError === "access_denied") {
+          displayError = "Access denied. The invitation link is invalid or has expired. Please request a new invitation.";
+        } else if (explicitDesc) {
+          displayError = explicitDesc.replace(/\+/g, " ");
+        }
+
+        const timer = setTimeout(() => {
+          if (isMounted && !resolved) {
+            setSessionError(displayError);
             setIsVerifyingSession(false);
           }
-        } else {
-          // If no session found yet, wait for onAuthStateChange (handles hash fragment parsing)
-          const { data: authListener } = supabase.auth.onAuthStateChange(
-            async (event, currentSession) => {
-              if (!isMounted) return;
+        }, 500);
 
-              if (currentSession?.user) {
-                setUserEmail(currentSession.user.email || null);
-                setIsVerifyingSession(false);
-              } else if (event === "SIGNED_OUT" || !currentSession) {
-                setTimeout(() => {
-                  if (isMounted) {
-                    setUserEmail((prev) => {
-                      if (!prev) {
-                        setSessionError(
-                          "No active invitation session found. Please use the invitation link sent to your email."
-                        );
-                        setIsVerifyingSession(false);
-                      }
-                      return prev;
-                    });
-                  }
-                }, 1500);
-              }
-            }
-          );
-
-          const timer = setTimeout(() => {
-            if (isMounted) {
-              setSessionError((prev) =>
-                prev ? prev : "No active invitation session found. Please use the invitation link sent to your email."
-              );
-              setIsVerifyingSession(false);
-            }
-          }, 2000);
-
-          return () => {
-            clearTimeout(timer);
-            authListener.subscription.unsubscribe();
-          };
-        }
+        return () => {
+          clearTimeout(timer);
+          authListener.subscription.unsubscribe();
+        };
       } catch (err) {
-        console.error("Failed to check auth state:", err);
         if (isMounted) {
-          setSessionError("An unexpected error occurred while verifying your session.");
+          setSessionError(
+            "This invitation link has expired or has already been used. Please request a fresh invitation from Celestia Studios."
+          );
           setIsVerifyingSession(false);
         }
       }
     }
 
-    checkSession();
+    initializeAndVerifySession();
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [initialError, initialErrorDescription]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -172,8 +234,7 @@ export function SetPasswordForm({ initialEmail }: SetPasswordFormProps) {
       setIsLoading(false);
 
       setTimeout(() => {
-        router.refresh();
-        router.push("/client");
+        window.location.href = "/client";
       }, 1000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "An unexpected error occurred.";

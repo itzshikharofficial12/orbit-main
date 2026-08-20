@@ -24,6 +24,7 @@ export const createClientSchema = z.object({
     .optional()
     .or(z.literal("")),
   status: clientStatusEnum.default("ACTIVE"),
+  project_manager_id: z.string().uuid("Invalid Project Manager ID").optional().nullable().or(z.literal("")),
   notes: z
     .string()
     .max(1000, "Notes must be 1000 characters or fewer")
@@ -53,6 +54,7 @@ export const updateClientSchema = z.object({
     .optional()
     .or(z.literal("")),
   status: clientStatusEnum,
+  project_manager_id: z.string().uuid("Invalid Project Manager ID").optional().nullable().or(z.literal("")),
   notes: z
     .string()
     .max(1000, "Notes must be 1000 characters or fewer")

@@ -7,6 +7,7 @@ import {
   markAllNotificationsAsReadAction,
 } from "../actions";
 import { useNotificationSound } from "./use-notification-sound";
+import { createBrowserClient } from "@/lib/supabase/client";
 import type { Notification } from "../types";
 
 export function useNotifications() {
@@ -29,7 +30,7 @@ export function useNotifications() {
 
       // Check if there are genuinely new unread notifications that were not seen before
       if (isInitialLoadRef.current) {
-        // Record existing notification IDs without playing sound
+        // Record existing notification IDs without playing sound on initial load
         items.forEach((item) => seenIdsRef.current.add(item.id));
         isInitialLoadRef.current = false;
       } else {
@@ -52,6 +53,33 @@ export function useNotifications() {
   // Initial load
   React.useEffect(() => {
     fetchFeed();
+  }, [fetchFeed]);
+
+  // Supabase Realtime channel subscription
+  React.useEffect(() => {
+    try {
+      const supabase = createBrowserClient();
+      const channel = supabase
+        .channel("realtime-notifications")
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "notifications",
+          },
+          () => {
+            fetchFeed();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      // Fall back safely to interval polling
+    }
   }, [fetchFeed]);
 
   // Background polling every 10 seconds and on tab focus

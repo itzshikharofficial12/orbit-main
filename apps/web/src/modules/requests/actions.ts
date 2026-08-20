@@ -2,46 +2,46 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerClient, getAuthenticatedProfile } from "@/lib/supabase/server";
+import { getAdminClient } from "@/lib/supabase/admin";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/types";
 import {
+  createClientRequestSchema,
   createChangeRequestSchema,
+  sendRequestMessageSchema,
   updateRequestStatusSchema,
+  updateRequestPrioritySchema,
+  type CreateClientRequestInput,
   type CreateChangeRequestInput,
+  type SendRequestMessageInput,
+  type UpdateRequestStatusInput,
+  type UpdateRequestPriorityInput,
 } from "./schema";
 import type {
   RequestActionResult,
   ClientRequest,
-  ClientRequestStatus,
+  RequestStatus,
+  RequestMessage,
 } from "./types";
-import type {
-  ClientRequestInsert,
-  ClientRequestUpdate,
-  Deliverable,
-  DeliverableUpdate,
-} from "@/lib/supabase/types";
 import { notifySuperAdmins, notifyClientUsers } from "@/modules/notifications/service";
 import { env } from "@/lib/env";
 
-export async function createChangeRequestAction(
-  input: CreateChangeRequestInput
+/**
+ * Universal Action: Create a client request across any category.
+ */
+export async function createClientRequestAction(
+  input: CreateClientRequestInput
 ): Promise<RequestActionResult> {
   if (!env.isConfigured()) {
-    return {
-      success: false,
-      error: "Supabase connection is not configured.",
-    };
+    return { success: false, error: "Supabase is not configured." };
   }
 
-  // 1. Authenticate the caller
   const profile = await getAuthenticatedProfile();
   if (!profile) {
-    return {
-      success: false,
-      error: "Unauthorized. Please sign in to submit a request.",
-    };
+    return { success: false, error: "Unauthorized. Please sign in." };
   }
 
-  // 2. Validate inputs
-  const validation = createChangeRequestSchema.safeParse(input);
+  const validation = createClientRequestSchema.safeParse(input);
   if (!validation.success) {
     const fieldErrors: Record<string, string[]> = {};
     validation.error.errors.forEach((err) => {
@@ -57,272 +57,510 @@ export async function createChangeRequestAction(
     };
   }
 
-  const { projectId, deliverableId, title, description, priority } = validation.data;
+  const {
+    title,
+    description,
+    category,
+    priority,
+    projectId,
+    deliverableId,
+    paymentId,
+    meetingId,
+    scheduleItemId,
+  } = validation.data;
+
+  // Resolve clientId
+  let clientId = profile.client_id;
+  if (!clientId && profile.role === "CLIENT") {
+    return { success: false, error: "Your account is not linked to a client organization." };
+  }
 
   try {
-    const supabase = await createServerClient();
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
 
-    // 3. Fetch project and verify ownership if CLIENT
-    const { data: rawProject, error: projErr } = await supabase
-      .from("projects")
-      .select("id, name, client_id, client:clients(name)")
-      .eq("id", projectId)
-      .maybeSingle();
+    // If projectId provided, verify client access
+    let projectName = "";
+    if (projectId) {
+      const { data: rawProject } = await supabase
+        .from("projects")
+        .select("id, name, client_id")
+        .eq("id", projectId)
+        .maybeSingle();
 
-    if (projErr || !rawProject) {
-      return {
-        success: false,
-        error: "Project not found or you do not have access to it.",
-      };
-    }
-
-    const project = rawProject as {
-      id: string;
-      name: string;
-      client_id: string | null;
-      client?: { name?: string } | null;
-    };
-
-    if (!project.client_id) {
-      return {
-        success: false,
-        error: "This project is not linked to a client organization.",
-      };
-    }
-
-    if (profile.role === "CLIENT") {
-      if (!profile.client_id || project.client_id !== profile.client_id) {
-        return {
-          success: false,
-          error: "You do not have access to request changes for this project.",
-        };
+      if (rawProject) {
+        projectName = (rawProject as { name: string }).name;
+        if (!clientId && (rawProject as { client_id: string | null }).client_id) {
+          clientId = (rawProject as { client_id: string }).client_id;
+        }
       }
     }
 
-    // 4. Fetch deliverable and verify it belongs to project and is in READY_FOR_REVIEW status
-    const { data: rawDeliverable, error: delivErr } = await supabase
-      .from("deliverables")
-      .select("*")
-      .eq("id", deliverableId)
-      .eq("project_id", projectId)
-      .maybeSingle();
-
-    if (delivErr || !rawDeliverable) {
-      return {
-        success: false,
-        error: "Deliverable not found or you do not have access to it.",
-      };
+    if (!clientId) {
+      // Fallback: lookup client from client_id
+      const { data: firstClient } = await supabase.from("clients").select("id, name").limit(1).maybeSingle();
+      if (firstClient) {
+        clientId = (firstClient as { id: string }).id;
+      }
     }
 
-    const deliverable = rawDeliverable as Deliverable;
-
-    if (deliverable.status === "APPROVED") {
-      return {
-        success: false,
-        error: "This deliverable has already been approved and cannot receive revision requests.",
-      };
+    if (!clientId) {
+      return { success: false, error: "Unable to associate request with client organization." };
     }
 
-    if (deliverable.status !== "READY_FOR_REVIEW") {
-      return {
-        success: false,
-        error: `Change requests can only be submitted for deliverables ready for review (current status: ${deliverable.status}).`,
-      };
-    }
-
-    // 5. Insert the new Change Request record
-    const requestPayload: ClientRequestInsert = {
-      client_id: project.client_id,
-      project_id: projectId,
-      deliverable_id: deliverableId,
-      title,
-      description,
-      status: "OPEN",
-      priority,
+    // Insert request
+    const insertPayload = {
+      client_id: clientId,
       created_by: profile.id,
+      title: title.trim(),
+      description: description.trim(),
+      category,
+      priority,
+      status: "OPEN" as const,
+      project_id: projectId || null,
+      deliverable_id: deliverableId || null,
+      payment_id: paymentId || null,
+      meeting_id: meetingId || null,
+      schedule_item_id: scheduleItemId || null,
     };
 
-    const { data: newRequest, error: reqInsertErr } = await supabase
+    const { data: createdRequest, error: insErr } = await supabase
       .from("client_requests")
-      .insert(requestPayload as never)
+      .insert(insertPayload as never)
       .select()
-      .maybeSingle();
+      .single();
 
-    if (reqInsertErr || !newRequest) {
-      console.error("Error creating client request:", reqInsertErr);
-      const isMissingTable =
-        reqInsertErr?.message?.includes("Could not find the table 'public.client_requests'") ||
-        reqInsertErr?.code === "PGRST204" ||
-        reqInsertErr?.code === "42P01";
-
-      return {
-        success: false,
-        error: isMissingTable
-          ? "Database migration required: Please run 00008_client_requests_schema.sql in your Supabase SQL Editor."
-          : reqInsertErr?.message || "Failed to create change request.",
-      };
+    if (insErr || !createdRequest) {
+      console.warn("Error creating client request:", insErr?.message || insErr);
+      return { success: false, error: insErr?.message || "Failed to create request." };
     }
 
-    const createdRequest = newRequest as ClientRequest;
+    const req = createdRequest as unknown as ClientRequest;
+    const refTag = req.reference_number || "REQ";
 
-    // 6. Transition Deliverable to CHANGES_REQUESTED
-    const deliverableUpdatePayload: DeliverableUpdate = {
-      status: "CHANGES_REQUESTED",
-      changes_requested_at: new Date().toISOString(),
-      changes_requested_by: profile.id,
-      client_feedback: `${title}: ${description}`,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error: delivUpdateErr } = await supabase
-      .from("deliverables")
-      .update(deliverableUpdatePayload as never)
-      .eq("id", deliverableId)
-      .eq("project_id", projectId);
-
-    if (delivUpdateErr) {
-      console.warn("Warning updating deliverable status after request:", delivUpdateErr);
-    }
-
-    // 7. Dispatch notification to Super Admin
-    const clientName = project.client?.name || "Client";
+    // Notify Super Admins with high visibility
+    const clientName = profile.first_name ? `${profile.first_name} ${profile.last_name || ""}`.trim() : profile.email;
     await notifySuperAdmins({
-      type: "CHANGES_REQUESTED",
-      title: "Changes requested",
-      message: `${clientName} requested changes on "${deliverable.title}": ${title}`,
-      link: `/hq/requests/${createdRequest.id}`,
+      type: "REQUEST_CREATED",
+      title: `New client request: ${title}`,
+      message: `[${refTag}] ${clientName} submitted a ${category} request:\n"${description.trim().slice(0, 140)}..."`,
+      link: `/hq/requests/${req.id}`,
     });
 
-    // 8. Revalidate paths
-    revalidatePath(`/client/projects/${projectId}`);
-    revalidatePath(`/hq/projects/${projectId}`);
-    revalidatePath(`/hq/requests`);
-    revalidatePath(`/hq/requests/${createdRequest.id}`);
-    revalidatePath(`/client`);
+    revalidatePath("/client/requests");
+    revalidatePath("/client");
+    revalidatePath("/hq/requests");
+    revalidatePath("/hq");
 
     return {
       success: true,
-      request: createdRequest,
+      request: req,
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "An unexpected server error occurred";
-    console.error("Unexpected error in createChangeRequestAction:", err);
-    return {
-      success: false,
-      error: message,
-    };
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
   }
 }
 
-export async function updateRequestStatusAction(
-  requestId: string,
-  newStatus: ClientRequestStatus
+/**
+ * Backwards-compatibility wrapper for deliverable change requests.
+ */
+export async function createChangeRequestAction(
+  input: CreateChangeRequestInput
 ): Promise<RequestActionResult> {
-  if (!env.isConfigured()) {
-    return {
-      success: false,
-      error: "Supabase connection is not configured.",
-    };
-  }
-
-  // 1. Authorize: Only Super Admin can mutate change request statuses
-  const profile = await getAuthenticatedProfile();
-  if (!profile || profile.role !== "SUPER_ADMIN") {
-    return {
-      success: false,
-      error: "Unauthorized. Only Super Admin can update request status.",
-    };
-  }
-
-  const validation = updateRequestStatusSchema.safeParse({
-    requestId,
-    status: newStatus,
+  return createClientRequestAction({
+    title: input.title,
+    description: input.description,
+    category: input.deliverableId ? "DELIVERABLE" : "PROJECT",
+    priority: input.priority || "MEDIUM",
+    projectId: input.projectId || null,
+    deliverableId: input.deliverableId || null,
   });
+}
 
+/**
+ * Threaded Conversation Action: Send a message in a request.
+ */
+export async function sendRequestMessageAction(
+  input: SendRequestMessageInput
+): Promise<RequestActionResult<RequestMessage>> {
+  if (!env.isConfigured()) {
+    return { success: false, error: "Supabase is not configured." };
+  }
+
+  const profile = await getAuthenticatedProfile();
+  if (!profile) {
+    return { success: false, error: "Unauthorized. Please sign in." };
+  }
+
+  const validation = sendRequestMessageSchema.safeParse(input);
   if (!validation.success) {
     return {
       success: false,
-      error: validation.error.errors[0]?.message || "Invalid status update parameters.",
+      error: validation.error.errors[0]?.message || "Invalid message",
     };
   }
 
+  const { requestId, message } = validation.data;
+
   try {
-    const supabase = await createServerClient();
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
 
-    // 2. Fetch existing request with relations
-    const { data: rawExisting, error: fetchErr } = await supabase
+    // 1. Verify request access
+    const { data: rawReq, error: reqErr } = await supabase
       .from("client_requests")
-      .select("*, project:projects(id, name), deliverable:deliverables(id, title)")
+      .select("id, reference_number, title, client_id, status, created_by")
       .eq("id", requestId)
       .maybeSingle();
 
-    if (fetchErr || !rawExisting) {
-      return {
-        success: false,
-        error: "Change request not found.",
-      };
+    if (reqErr || !rawReq) {
+      return { success: false, error: "Request not found or access denied." };
     }
 
-    const existing = rawExisting as ClientRequest & {
-      project?: { id: string; name: string };
-      deliverable?: { id: string; title: string };
+    const req = rawReq as {
+      id: string;
+      reference_number: string | null;
+      title: string;
+      client_id: string;
+      status: RequestStatus;
+      created_by: string;
     };
 
-    // 3. Prepare payload with resolution timestamps if RESOLVED
-    const isResolving = newStatus === "RESOLVED";
-    const payload: ClientRequestUpdate = {
-      status: newStatus,
-      updated_at: new Date().toISOString(),
-      resolved_at: isResolving ? new Date().toISOString() : null,
-      resolved_by: isResolving ? profile.id : null,
-    };
+    if (profile.role === "CLIENT" && profile.client_id !== req.client_id) {
+      return { success: false, error: "Unauthorized access to this request." };
+    }
 
-    const { data, error } = await supabase
+    // 2. Insert message into request_messages
+    const { data: newMsg, error: msgErr } = await supabase
+      .from("request_messages")
+      .insert({
+        request_id: requestId,
+        sender_id: profile.id,
+        message: message.trim(),
+        is_internal: false,
+      } as never)
+      .select(`
+        *,
+        sender:profiles!request_messages_sender_id_fkey(id, first_name, last_name, email, role)
+      `)
+      .single();
+
+    if (msgErr || !newMsg) {
+      console.warn("Error inserting request message:", msgErr?.message || msgErr);
+      return { success: false, error: msgErr?.message || "Failed to send message." };
+    }
+
+    // 3. Update request updated_at timestamp & auto-transition status if appropriate
+    let nextStatus = req.status;
+    if (profile.role === "SUPER_ADMIN" && req.status === "OPEN") {
+      nextStatus = "IN_PROGRESS";
+    }
+
+    await supabase
       .from("client_requests")
-      .update(payload as never)
-      .eq("id", requestId)
-      .select()
-      .maybeSingle();
+      .update({
+        status: nextStatus,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", requestId);
 
-    if (error || !data) {
-      console.error("Error updating change request status:", error);
-      return {
-        success: false,
-        error: error?.message || "Failed to update change request status.",
-      };
-    }
+    const refTag = req.reference_number || "REQ";
+    const senderName = profile.first_name ? `${profile.first_name} ${profile.last_name || ""}`.trim() : profile.email;
 
-    const updated = data as ClientRequest;
-
-    // 4. Notify client if marked RESOLVED
-    if (isResolving && existing.client_id) {
-      const deliverableTitle = existing.deliverable?.title || "deliverable";
+    // 4. Send Notifications
+    if (profile.role === "CLIENT") {
+      // Client replied -> Notify Super Admins
+      await notifySuperAdmins({
+        type: "REQUEST_REPLY",
+        title: `Reply on ${refTag}: ${req.title}`,
+        message: `${senderName} replied:\n"${message.trim().slice(0, 140)}..."`,
+        link: `/hq/requests/${requestId}`,
+      });
+    } else {
+      // Admin replied -> Notify Client Users
       await notifyClientUsers({
-        clientId: existing.client_id,
-        type: "REQUEST_RESOLVED",
-        title: "Change request resolved",
-        message: `Your requested changes for "${deliverableTitle}" have been resolved.`,
-        link: `/client/projects/${existing.project_id}`,
+        clientId: req.client_id,
+        type: "REQUEST_RESPONSE",
+        title: `Response received on ${refTag}`,
+        message: `Celestia Studios responded to "${req.title}":\n"${message.trim().slice(0, 140)}..."`,
+        link: `/client/requests/${requestId}`,
       });
     }
 
-    // 5. Revalidate paths
-    revalidatePath("/hq/requests");
+    revalidatePath(`/client/requests/${requestId}`);
     revalidatePath(`/hq/requests/${requestId}`);
-    revalidatePath(`/hq/projects/${existing.project_id}`);
-    revalidatePath(`/client/projects/${existing.project_id}`);
-    revalidatePath("/client");
+    revalidatePath("/client/requests");
+    revalidatePath("/hq/requests");
 
     return {
       success: true,
-      request: updated,
+      data: newMsg as unknown as RequestMessage,
     };
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "An unexpected server error occurred";
-    console.error("Unexpected error in updateRequestStatusAction:", err);
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Action: Update request status and notify parties.
+ */
+export async function updateRequestStatusAction(
+  input: UpdateRequestStatusInput
+): Promise<RequestActionResult> {
+  if (!env.isConfigured()) {
+    return { success: false, error: "Supabase is not configured." };
+  }
+
+  const profile = await getAuthenticatedProfile();
+  if (!profile) {
+    return { success: false, error: "Unauthorized. Please sign in." };
+  }
+
+  const validation = updateRequestStatusSchema.safeParse(input);
+  if (!validation.success) {
     return {
       success: false,
-      error: message,
+      error: validation.error.errors[0]?.message || "Invalid status",
     };
+  }
+
+  const { requestId, status, resolutionNotes } = validation.data;
+
+  try {
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
+
+    const { data: rawReq, error: fetchErr } = await supabase
+      .from("client_requests")
+      .select("id, reference_number, title, client_id, status")
+      .eq("id", requestId)
+      .maybeSingle();
+
+    if (fetchErr || !rawReq) {
+      return { success: false, error: "Request not found." };
+    }
+
+    const req = rawReq as {
+      id: string;
+      reference_number: string | null;
+      title: string;
+      client_id: string;
+      status: RequestStatus;
+    };
+
+    const updatePayload: Record<string, unknown> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (status === "RESOLVED" || status === "CLOSED") {
+      updatePayload.resolved_at = new Date().toISOString();
+      updatePayload.resolved_by = profile.id;
+    } else {
+      updatePayload.resolved_at = null;
+      updatePayload.resolved_by = null;
+    }
+
+    const { data: updatedReq, error: updateErr } = await supabase
+      .from("client_requests")
+      .update(updatePayload as never)
+      .eq("id", requestId)
+      .select()
+      .single();
+
+    if (updateErr) {
+      console.warn("Error updating request status:", updateErr.message);
+      return { success: false, error: updateErr.message };
+    }
+
+    // Optional: add resolution notes message if provided
+    if (resolutionNotes?.trim()) {
+      await supabase.from("request_messages").insert({
+        request_id: requestId,
+        sender_id: profile.id,
+        message: `[Status changed to ${status.replace(/_/g, " ")}]: ${resolutionNotes.trim()}`,
+        is_internal: false,
+      } as never);
+    }
+
+    const refTag = req.reference_number || "REQ";
+
+    // Notify client of status change
+    let notifTitle = `Request ${refTag} updated`;
+    let notifMsg = `Your request "${req.title}" is now ${status.replace(/_/g, " ")}.`;
+
+    if (status === "WAITING_FOR_CLIENT") {
+      notifTitle = `Action required on ${refTag}`;
+      notifMsg = `Celestia Studios has requested information on "${req.title}".`;
+    } else if (status === "RESOLVED") {
+      notifTitle = `Your request ${refTag} has been resolved`;
+      notifMsg = `"${req.title}" has been marked as resolved by Celestia Studios.`;
+    }
+
+    await notifyClientUsers({
+      clientId: req.client_id,
+      type: status === "WAITING_FOR_CLIENT" ? "ACTION_REQUIRED" : "REQUEST_STATUS_CHANGED",
+      title: notifTitle,
+      message: notifMsg,
+      link: `/client/requests/${requestId}`,
+    });
+
+    revalidatePath(`/client/requests/${requestId}`);
+    revalidatePath(`/hq/requests/${requestId}`);
+    revalidatePath("/client/requests");
+    revalidatePath("/hq/requests");
+
+    return {
+      success: true,
+      request: updatedReq as unknown as ClientRequest,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Action: Client reopens a resolved request.
+ */
+export async function reopenRequestAction(requestId: string): Promise<RequestActionResult> {
+  if (!env.isConfigured()) {
+    return { success: false, error: "Supabase is not configured." };
+  }
+
+  const profile = await getAuthenticatedProfile();
+  if (!profile) {
+    return { success: false, error: "Unauthorized." };
+  }
+
+  try {
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
+
+    const { data: rawReq, error: fetchErr } = await supabase
+      .from("client_requests")
+      .select("id, reference_number, title, client_id, status")
+      .eq("id", requestId)
+      .maybeSingle();
+
+    if (fetchErr || !rawReq) {
+      return { success: false, error: "Request not found." };
+    }
+
+    const req = rawReq as {
+      id: string;
+      reference_number: string | null;
+      title: string;
+      client_id: string;
+      status: RequestStatus;
+    };
+
+    if (profile.role === "CLIENT" && profile.client_id !== req.client_id) {
+      return { success: false, error: "Unauthorized access." };
+    }
+
+    // Move status back to OPEN
+    const { data: updatedReq, error: updateErr } = await supabase
+      .from("client_requests")
+      .update({
+        status: "OPEN",
+        resolved_at: null,
+        resolved_by: null,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", requestId)
+      .select()
+      .single();
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
+    }
+
+    // Add automated reopen note to conversation thread
+    const senderName = profile.first_name ? `${profile.first_name} ${profile.last_name || ""}`.trim() : profile.email;
+    await supabase.from("request_messages").insert({
+      request_id: requestId,
+      sender_id: profile.id,
+      message: `[Request Reopened by ${senderName}]`,
+      is_internal: false,
+    } as never);
+
+    const refTag = req.reference_number || "REQ";
+
+    // Notify Super Admins
+    await notifySuperAdmins({
+      type: "REQUEST_REOPENED",
+      title: `Request Reopened: ${refTag}`,
+      message: `${senderName} reopened request "${req.title}".`,
+      link: `/hq/requests/${requestId}`,
+    });
+
+    revalidatePath(`/client/requests/${requestId}`);
+    revalidatePath(`/hq/requests/${requestId}`);
+    revalidatePath("/client/requests");
+    revalidatePath("/hq/requests");
+
+    return {
+      success: true,
+      request: updatedReq as unknown as ClientRequest,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
+  }
+}
+
+/**
+ * Action: Update request priority (Admin).
+ */
+export async function updateRequestPriorityAction(
+  input: UpdateRequestPriorityInput
+): Promise<RequestActionResult> {
+  if (!env.isConfigured()) {
+    return { success: false, error: "Supabase is not configured." };
+  }
+
+  const profile = await getAuthenticatedProfile();
+  if (!profile || profile.role !== "SUPER_ADMIN") {
+    return { success: false, error: "Unauthorized. Admin privileges required." };
+  }
+
+  const validation = updateRequestPrioritySchema.safeParse(input);
+  if (!validation.success) {
+    return { success: false, error: "Invalid priority value" };
+  }
+
+  try {
+    const admin = getAdminClient();
+    const supabase = (admin || (await createServerClient())) as unknown as SupabaseClient<Database>;
+
+    const { data: updatedReq, error } = await supabase
+      .from("client_requests")
+      .update({
+        priority: validation.data.priority,
+        updated_at: new Date().toISOString(),
+      } as never)
+      .eq("id", validation.data.requestId)
+      .select()
+      .single();
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    revalidatePath(`/client/requests/${validation.data.requestId}`);
+    revalidatePath(`/hq/requests/${validation.data.requestId}`);
+    revalidatePath("/client/requests");
+    revalidatePath("/hq/requests");
+
+    return {
+      success: true,
+      request: updatedReq as unknown as ClientRequest,
+    };
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Unexpected server error";
+    return { success: false, error: msg };
   }
 }

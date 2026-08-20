@@ -83,6 +83,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../src/app/(dashboard)/client/notifications/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/client/notifications">> = Specific
+  const handler = {} as typeof import("../../src/app/(dashboard)/client/notifications/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../src/app/(dashboard)/client/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/client">> = Specific
@@ -114,6 +123,24 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends AppPageConfig<"/client/projects/[projectId]">> = Specific
   const handler = {} as typeof import("../../src/app/(dashboard)/client/projects/[projectId]/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(dashboard)/client/requests/[requestId]/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/client/requests/[requestId]">> = Specific
+  const handler = {} as typeof import("../../src/app/(dashboard)/client/requests/[requestId]/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/(dashboard)/client/requests/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/client/requests">> = Specific
+  const handler = {} as typeof import("../../src/app/(dashboard)/client/requests/page.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check
@@ -209,6 +236,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../src/app/(dashboard)/hq/team/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/hq/team">> = Specific
+  const handler = {} as typeof import("../../src/app/(dashboard)/hq/team/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../src/app/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/">> = Specific
@@ -240,6 +276,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends RouteHandlerConfig<"/api/payments/receipts/[paymentId]/pdf">> = Specific
   const handler = {} as typeof import("../../src/app/api/payments/receipts/[paymentId]/pdf/route.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/api/webhooks/razorpay/route.ts
+{
+  type __IsExpected<Specific extends RouteHandlerConfig<"/api/webhooks/razorpay">> = Specific
+  const handler = {} as typeof import("../../src/app/api/webhooks/razorpay/route.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

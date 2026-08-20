@@ -23,20 +23,34 @@ interface CreateBillingPlanDialogProps {
   clients: Client[];
   projects: Project[];
   milestones?: Milestone[];
+  preselectedClientId?: string;
+  preselectedProjectId?: string;
+  trigger?: React.ReactNode;
+  triggerButton?: React.ReactNode;
+  triggerButtonText?: string;
 }
 
 export function CreateBillingPlanDialog({
   clients,
   projects,
   milestones = [],
+  preselectedClientId,
+  preselectedProjectId,
+  trigger,
+  triggerButton,
+  triggerButtonText,
 }: CreateBillingPlanDialogProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [isPending, startTransition] = React.useTransition();
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   // Form State
-  const [selectedClientId, setSelectedClientId] = React.useState("");
-  const [selectedProjectId, setSelectedProjectId] = React.useState("");
+  const [selectedClientId, setSelectedClientId] = React.useState(
+    preselectedClientId || (clients[0]?.id || "")
+  );
+  const [selectedProjectId, setSelectedProjectId] = React.useState(
+    preselectedProjectId || ""
+  );
   const [planName, setPlanName] = React.useState("");
   const [description, setDescription] = React.useState("");
   const [billingType, setBillingType] = React.useState<BillingType>("ONE_TIME");
@@ -259,10 +273,16 @@ export function CreateBillingPlanDialog({
 
   return (
     <>
-      <Button onClick={handleOpen} className="h-9 gap-1.5 text-xs font-medium cursor-pointer">
-        <Plus className="h-3.5 w-3.5" />
-        <span>Create Billing Plan</span>
-      </Button>
+      {trigger ? (
+        <span onClick={handleOpen} className="inline-block cursor-pointer">{trigger}</span>
+      ) : triggerButton ? (
+        <span onClick={handleOpen} className="inline-block cursor-pointer">{triggerButton}</span>
+      ) : (
+        <Button onClick={handleOpen} className="h-9 gap-1.5 text-xs font-medium cursor-pointer">
+          <Plus className="h-3.5 w-3.5" />
+          <span>{triggerButtonText || "Create Billing Plan"}</span>
+        </Button>
+      )}
 
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">

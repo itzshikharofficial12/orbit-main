@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Users, FolderKanban, Inbox, Video, CreditCard, LogOut, Menu, X } from "lucide-react";
+import { LayoutGrid, Users, FolderKanban, Inbox, Video, CreditCard, Bell, LogOut, Menu, X, UserCheck } from "lucide-react";
 import type { Profile } from "@/lib/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { OrbitBrand } from "@/components/brand/orbit-brand";
@@ -48,6 +48,12 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
             isActive: pathname.startsWith("/hq/projects"),
           },
           {
+            label: "Team",
+            href: "/hq/team",
+            icon: UserCheck,
+            isActive: pathname.startsWith("/hq/team"),
+          },
+          {
             label: "Requests",
             href: "/hq/requests",
             icon: Inbox,
@@ -71,7 +77,19 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
             label: "Overview",
             href: "/client",
             icon: LayoutGrid,
-            isActive: pathname === "/client" || pathname.startsWith("/client/projects"),
+            isActive: pathname === "/client" || (pathname.startsWith("/client/projects") && !pathname.startsWith("/client/requests")),
+          },
+          {
+            label: "Requests",
+            href: "/client/requests",
+            icon: Inbox,
+            isActive: pathname.startsWith("/client/requests"),
+          },
+          {
+            label: "Notifications",
+            href: "/client/notifications",
+            icon: Bell,
+            isActive: pathname.startsWith("/client/notifications"),
           },
           {
             label: "Meetings",
@@ -169,7 +187,7 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
                   {displayName}
                 </span>
                 <Badge variant="role">
-                  {profile?.role === "SUPER_ADMIN" ? "HQ" : "Client"}
+                  {profile?.role === "SUPER_ADMIN" ? "HQ" : profile?.role === "EMPLOYEE" ? "Team" : "Client"}
                 </Badge>
               </div>
               <span className="text-xs text-muted-foreground truncate">

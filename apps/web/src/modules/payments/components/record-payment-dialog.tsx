@@ -13,8 +13,10 @@ interface RecordPaymentDialogProps {
   projects: Project[];
   plans?: BillingPlanWithRelations[];
   defaultPlan?: BillingPlanWithRelations | null;
+  preselectedPlan?: BillingPlanWithRelations | null;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  trigger?: React.ReactNode;
   triggerButton?: React.ReactNode;
 }
 
@@ -23,10 +25,13 @@ export function RecordPaymentDialog({
   projects,
   plans = [],
   defaultPlan = null,
+  preselectedPlan = null,
   open: controlledOpen,
   onOpenChange: setControlledOpen,
+  trigger,
   triggerButton,
 }: RecordPaymentDialogProps) {
+  const activeDefault = defaultPlan || preselectedPlan;
   const [internalOpen, setInternalOpen] = React.useState(false);
   const isControlled = controlledOpen !== undefined;
   const isOpen = isControlled ? controlledOpen : internalOpen;
@@ -36,10 +41,10 @@ export function RecordPaymentDialog({
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   const [selectedClientId, setSelectedClientId] = React.useState<string>(
-    defaultPlan?.client_id || (clients[0]?.id || "")
+    activeDefault?.client_id || (clients[0]?.id || "")
   );
   const [selectedProjectId, setSelectedProjectId] = React.useState<string>(
-    defaultPlan?.project_id || ""
+    activeDefault?.project_id || ""
   );
   const [selectedScheduleId, setSelectedScheduleId] = React.useState<string>("");
   const [amount, setAmount] = React.useState<number>(0);
@@ -47,7 +52,13 @@ export function RecordPaymentDialog({
   const [paidAt, setPaidAt] = React.useState(() => new Date().toISOString().split("T")[0]);
   const [notes, setNotes] = React.useState("");
 
-  // Sync state if defaultPlan prop updates
+  // Sync state if defaultPlan / preselectedPlan prop updates
+  React.useEffect(() => {
+    if (activeDefault) {
+      setSelectedClientId(activeDefault.client_id);
+      setSelectedProjectId(activeDefault.project_id || "");
+    }
+  }, [activeDefault]);
   React.useEffect(() => {
     if (defaultPlan) {
       setSelectedClientId(defaultPlan.client_id);
@@ -129,8 +140,10 @@ export function RecordPaymentDialog({
 
   return (
     <>
-      {triggerButton ? (
-        <span onClick={() => setIsOpen(true)}>{triggerButton}</span>
+      {trigger ? (
+        <span onClick={() => setIsOpen(true)} className="inline-block cursor-pointer">{trigger}</span>
+      ) : triggerButton ? (
+        <span onClick={() => setIsOpen(true)} className="inline-block cursor-pointer">{triggerButton}</span>
       ) : (
         <Button
           variant="outline"

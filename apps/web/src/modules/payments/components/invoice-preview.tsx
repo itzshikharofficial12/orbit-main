@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BillingStatusBadge } from "./billing-status-badge";
+import { CompletePaymentModal } from "./complete-payment-modal";
+import { PaymentQueryModal } from "./payment-query-modal";
 import { formatCurrency, formatPaymentDate } from "../utils";
 import { CELESTIA_COMPANY_INFO } from "../config";
 import type { InvoiceWithDetails } from "../types";
@@ -32,6 +34,8 @@ export function InvoicePreview({
   isSuperAdmin,
   onRecordPayment,
 }: InvoicePreviewProps) {
+  const [showPaymentModal, setShowPaymentModal] = React.useState(false);
+  const [showQueryModal, setShowQueryModal] = React.useState(false);
   const backHref = isSuperAdmin ? "/hq/payments" : "/client/payments";
   const pdfDownloadUrl = `/api/payments/invoices/${invoice.id}/pdf`;
 
@@ -49,12 +53,25 @@ export function InvoicePreview({
 
         <div className="flex items-center gap-2">
           {!isSuperAdmin && invoice.balance_due > 0 && (
-            <Link href={`/client?query=Invoice+Query+${invoice.invoice_number}`}>
-              <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs">
+            <>
+              <Button
+                size="sm"
+                onClick={() => setShowPaymentModal(true)}
+                className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
+              >
+                <CreditCard className="h-3.5 w-3.5" />
+                <span>Pay Now</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowQueryModal(true)}
+                className="h-8 gap-1.5 text-xs border-border/80 hover:bg-secondary"
+              >
                 <HelpCircle className="h-3.5 w-3.5 text-amber-400" />
                 <span>Raise a Query</span>
               </Button>
-            </Link>
+            </>
           )}
 
           {isSuperAdmin && invoice.balance_due > 0 && onRecordPayment && (
@@ -297,6 +314,39 @@ export function InvoicePreview({
           </div>
         )}
       </div>
+
+      {showPaymentModal && (
+        <CompletePaymentModal
+          item={{
+            id: invoice.id,
+            title: invoice.title,
+            amount: invoice.balance_due,
+            currency: invoice.currency,
+            dueDate: invoice.due_date,
+            projectName: invoice.project?.name,
+          }}
+          isOpen={showPaymentModal}
+          onClose={() => setShowPaymentModal(false)}
+        />
+      )}
+
+      {showQueryModal && (
+        <PaymentQueryModal
+          isOpen={showQueryModal}
+          onClose={() => setShowQueryModal(false)}
+          items={[
+            {
+              id: invoice.id,
+              title: invoice.title,
+              amount: invoice.balance_due,
+              currency: invoice.currency,
+              projectId: invoice.project?.id || undefined,
+            },
+          ]}
+          preselectedItemId={invoice.id}
+          defaultProjectId={invoice.project?.id || undefined}
+        />
+      )}
     </div>
   );
 }

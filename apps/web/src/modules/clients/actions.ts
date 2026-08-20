@@ -16,7 +16,7 @@ import type {
   ClientStatus,
 } from "./types";
 import type { ClientInsert, ClientUpdate } from "@/lib/supabase/types";
-import { env } from "@/lib/env";
+import { env, getCanonicalAppUrl } from "@/lib/env";
 
 export async function createClientAction(formData: FormData): Promise<ClientActionResult> {
   if (!env.isConfigured()) {
@@ -32,6 +32,7 @@ export async function createClientAction(formData: FormData): Promise<ClientActi
     primary_contact_email: formData.get("primary_contact_email") as string,
     primary_contact_phone: (formData.get("primary_contact_phone") as string) || "",
     status: (formData.get("status") as string) || "ACTIVE",
+    project_manager_id: (formData.get("project_manager_id") as string) || null,
     notes: (formData.get("notes") as string) || "",
   };
 
@@ -54,13 +55,19 @@ export async function createClientAction(formData: FormData): Promise<ClientActi
 
   try {
     const supabase = await createServerClient();
+    const pmId = validation.data.project_manager_id || null;
+    let finalNotes = validation.data.notes || null;
+    if (pmId) {
+      finalNotes = finalNotes ? `${finalNotes}\n[PM: ${pmId}]` : `[PM: ${pmId}]`;
+    }
+
     const insertPayload: ClientInsert = {
       name: validation.data.name,
       primary_contact_name: validation.data.primary_contact_name,
       primary_contact_email: validation.data.primary_contact_email,
       primary_contact_phone: validation.data.primary_contact_phone || null,
       status: validation.data.status,
-      notes: validation.data.notes || null,
+      notes: finalNotes,
     };
 
     const { data, error } = await supabase
@@ -77,6 +84,7 @@ export async function createClientAction(formData: FormData): Promise<ClientActi
     }
 
     revalidatePath("/hq/clients");
+    revalidatePath("/hq/team");
     revalidatePath("/hq");
 
     return {
@@ -165,6 +173,7 @@ export async function updateClientAction(
     primary_contact_email: formData.get("primary_contact_email") as string,
     primary_contact_phone: (formData.get("primary_contact_phone") as string) || "",
     status: (formData.get("status") as string) || "ACTIVE",
+    project_manager_id: (formData.get("project_manager_id") as string) || null,
     notes: (formData.get("notes") as string) || "",
   };
 
@@ -178,13 +187,19 @@ export async function updateClientAction(
 
   try {
     const supabase = await createServerClient();
+    const pmId = validation.data.project_manager_id || null;
+    let finalNotes = validation.data.notes || null;
+    if (pmId) {
+      finalNotes = finalNotes ? `${finalNotes}\n[PM: ${pmId}]` : `[PM: ${pmId}]`;
+    }
+
     const updatePayload: ClientUpdate = {
       name: validation.data.name,
       primary_contact_name: validation.data.primary_contact_name,
       primary_contact_email: validation.data.primary_contact_email,
       primary_contact_phone: validation.data.primary_contact_phone || null,
       status: validation.data.status,
-      notes: validation.data.notes || null,
+      notes: finalNotes,
       updated_at: new Date().toISOString(),
     };
 
@@ -204,6 +219,8 @@ export async function updateClientAction(
 
     revalidatePath("/hq/clients");
     revalidatePath(`/hq/clients/${clientId}`);
+    revalidatePath("/hq/team");
+    revalidatePath("/client");
 
     return {
       success: true,
@@ -252,14 +269,15 @@ export async function inviteClientUserAction(
   }
 
   try {
-    const supabase = await createServerClient();
     const adminClient = getAdminClient();
+    const dbClient = (adminClient || (await createServerClient())) as unknown as import("@supabase/supabase-js").SupabaseClient<import("@/lib/supabase/types").Database>;
+    const normalizedEmail = validation.data.email.trim().toLowerCase();
 
     // 1. Check if user profile already exists with this email
-    const { data: rawProfile } = await supabase
+    const { data: rawProfile } = await dbClient
       .from("profiles")
       .select("id, client_id, email, role")
-      .ilike("email", validation.data.email)
+      .ilike("email", normalizedEmail)
       .maybeSingle();
 
     const existingProfile = rawProfile as unknown as {
@@ -278,13 +296,13 @@ export async function inviteClientUserAction(
       }
 
       // Link profile to this client
-      const { error: linkError } = await supabase
+      const { error: linkError } = await dbClient
         .from("profiles")
         .update({
           client_id: clientId,
           role: "CLIENT",
-          first_name: validation.data.first_name,
-          last_name: validation.data.last_name || null,
+          first_name: validation.data.first_name.trim(),
+          last_name: validation.data.last_name?.trim() || null,
           updated_at: new Date().toISOString(),
         } as never)
         .eq("id", existingProfile.id);
@@ -307,16 +325,19 @@ export async function inviteClientUserAction(
 
     // 2. If profile does not exist and adminClient is available, invite user
     if (adminClient) {
+      const baseUrl = await getCanonicalAppUrl();
+      const confirmationUrl = `${baseUrl}/auth/confirm?next=/set-password`;
+
       const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
-        validation.data.email,
+        normalizedEmail,
         {
           data: {
             role: "CLIENT",
             client_id: clientId,
-            first_name: validation.data.first_name,
-            last_name: validation.data.last_name || null,
+            first_name: validation.data.first_name.trim(),
+            last_name: validation.data.last_name?.trim() || null,
           },
-          redirectTo: `${env.siteUrl}/set-password`,
+          redirectTo: confirmationUrl,
         }
       );
 
@@ -332,7 +353,7 @@ export async function inviteClientUserAction(
 
       return {
         success: true,
-        message: `Invitation email sent to ${validation.data.email}.`,
+        message: `Invitation email sent to ${normalizedEmail}.`,
       };
     }
 
@@ -363,8 +384,12 @@ export async function sendClientPasswordResetAction(
 
   try {
     const supabase = await createServerClient();
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${env.siteUrl}/set-password`,
+    const normalizedEmail = email.trim().toLowerCase();
+    const baseUrl = await getCanonicalAppUrl();
+    const confirmationUrl = `${baseUrl}/auth/confirm?next=/set-password`;
+
+    const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
+      redirectTo: confirmationUrl,
     });
 
     if (error) {
@@ -378,7 +403,7 @@ export async function sendClientPasswordResetAction(
 
     return {
       success: true,
-      message: `Password reset email sent to ${email}.`,
+      message: `Password reset email sent to ${normalizedEmail}.`,
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "An unexpected error occurred";

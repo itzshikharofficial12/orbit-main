@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getAuthenticatedProfile } from "@/lib/supabase/server";
 import { OrbitShell } from "@/components/layout/orbit-shell";
 import { getClients } from "@/modules/clients/data";
+import { getActiveProjectManagers } from "@/modules/team/data";
 import { ClientList } from "@/modules/clients/components/client-list";
 import { AddClientDialog } from "@/modules/clients/components/add-client-dialog";
 
@@ -23,7 +24,10 @@ export default async function ClientsPage() {
     redirect("/client");
   }
 
-  const clients = await getClients();
+  const [clients, projectManagers] = await Promise.all([
+    getClients(),
+    getActiveProjectManagers(),
+  ]);
 
   return (
     <OrbitShell
@@ -31,7 +35,7 @@ export default async function ClientsPage() {
       basePath="/hq"
       title="Clients"
       description="Manage Celestia Studios clients and their active engagements."
-      actions={<AddClientDialog />}
+      actions={<AddClientDialog projectManagers={projectManagers} />}
     >
       <ClientList initialClients={clients} />
     </OrbitShell>

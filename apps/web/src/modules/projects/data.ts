@@ -286,3 +286,107 @@ export async function getProjectStats(): Promise<ProjectStats> {
 
   return stats;
 }
+
+export async function getClientProjectsWithOverview(
+  clientId: string
+): Promise<import("./types").ProjectWithNextStep[]> {
+  if (!env.isConfigured() || !clientId) return [];
+
+  try {
+    const supabase = await createServerClient();
+    const { data: projectsData, error } = await supabase
+      .from("projects")
+      .select(`
+        *,
+        client:clients(id, name, status, primary_contact_name, primary_contact_email),
+        milestones(id, name, status, position, created_at),
+        deliverables(id, title, status, expected_delivery_date)
+      `)
+      .eq("client_id", clientId)
+      .order("created_at", { ascending: false });
+
+    if (error || !projectsData) {
+      console.warn("Notice fetching client projects with overview:", error?.message);
+      return [];
+    }
+
+    return projectsData.map((row: any) => {
+      const rawMilestones = (row.milestones as Array<{
+        id: string;
+        name: string;
+        status: string;
+        position: number;
+        created_at: string;
+      }>) || [];
+
+      // Sort milestones by position
+      const sortedMilestones = [...rawMilestones].sort(
+        (a, b) => (a.position || 0) - (b.position || 0)
+      );
+
+      const milestoneCount = sortedMilestones.length;
+      const completedMilestones = sortedMilestones.filter((m) => m.status === "COMPLETED");
+      const completedMilestoneCount = completedMilestones.length;
+      const inProgressMilestones = sortedMilestones.filter((m) => m.status === "IN_PROGRESS");
+      const plannedMilestones = sortedMilestones.filter((m) => m.status === "PLANNED");
+      const progress =
+        milestoneCount === 0
+          ? 0
+          : Math.round((completedMilestoneCount / milestoneCount) * 100);
+
+      // Find next incomplete milestone
+      const nextMilestone = sortedMilestones.find(
+        (m) => m.status === "IN_PROGRESS" || m.status === "PLANNED"
+      ) || null;
+
+      // Check deliverables for next step determination
+      const deliverables = (row.deliverables as Array<{
+        id: string;
+        title: string;
+        status: string;
+      }>) || [];
+
+      const reviewableDeliverable = deliverables.find(
+        (d) => d.status === "READY_FOR_REVIEW"
+      );
+
+      let nextStep = "Project is currently in progress.";
+      if (reviewableDeliverable) {
+        nextStep = `Review "${reviewableDeliverable.title}"`;
+      } else if (nextMilestone) {
+        if (nextMilestone.status === "IN_PROGRESS") {
+          nextStep = `${nextMilestone.name} is in progress`;
+        } else {
+          nextStep = `Preparing for ${nextMilestone.name}`;
+        }
+      } else if (milestoneCount > 0 && completedMilestoneCount === milestoneCount) {
+        nextStep = "All project milestones completed";
+      }
+
+      const { milestones: _m, deliverables: _d, ...projectData } = row;
+
+      return {
+        ...(projectData as import("./types").Project),
+        client: row.client,
+        milestone_count: milestoneCount,
+        completed_milestone_count: completedMilestoneCount,
+        in_progress_milestone_count: inProgressMilestones.length,
+        planned_milestone_count: plannedMilestones.length,
+        progress,
+        next_milestone: nextMilestone
+          ? {
+              id: nextMilestone.id,
+              name: nextMilestone.name,
+              status: nextMilestone.status as any,
+              position: nextMilestone.position,
+            }
+          : null,
+        next_step: nextStep,
+      };
+    });
+  } catch (err) {
+    console.warn("Error in getClientProjectsWithOverview:", err);
+    return [];
+  }
+}
+

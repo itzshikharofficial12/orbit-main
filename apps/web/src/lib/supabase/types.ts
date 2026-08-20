@@ -6,7 +6,16 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
-export type OrbitRole = "SUPER_ADMIN" | "CLIENT";
+export type OrbitRole = "SUPER_ADMIN" | "CLIENT" | "EMPLOYEE";
+export type EmployeeJobRole =
+  | "PROJECT_MANAGER"
+  | "DEVELOPER"
+  | "DESIGNER"
+  | "CONTENT"
+  | "MARKETING"
+  | "SALES"
+  | "OTHER";
+export type EmployeeStatus = "ACTIVE" | "INACTIVE";
 export type ClientStatus = "ACTIVE" | "PAUSED" | "COMPLETED" | "ARCHIVED";
 
 export type ServiceType =
@@ -36,8 +45,8 @@ export type DeliverableStatus =
   | "APPROVED"
   | "ARCHIVED";
 
-export type ClientRequestStatus = "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
-export type ClientRequestPriority = "LOW" | "MEDIUM" | "HIGH";
+export type ClientRequestStatus = "OPEN" | "IN_PROGRESS" | "WAITING_FOR_CLIENT" | "RESOLVED" | "CLOSED";
+export type ClientRequestPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 export type MeetingStatus = "SCHEDULED" | "COMPLETED" | "CANCELLED";
 
 export type BillingType =
@@ -78,6 +87,36 @@ export type PaymentStatus =
 export interface Database {
   public: {
     Tables: {
+      client_pm_history: {
+        Row: {
+          id: string;
+          client_id: string;
+          previous_pm_id: string | null;
+          new_pm_id: string | null;
+          changed_by: string | null;
+          changed_at: string;
+          note: string | null;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          previous_pm_id?: string | null;
+          new_pm_id?: string | null;
+          changed_by?: string | null;
+          changed_at?: string;
+          note?: string | null;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          previous_pm_id?: string | null;
+          new_pm_id?: string | null;
+          changed_by?: string | null;
+          changed_at?: string;
+          note?: string | null;
+        };
+        Relationships: [];
+      };
       clients: {
         Row: {
           id: string;
@@ -86,6 +125,7 @@ export interface Database {
           primary_contact_name: string;
           primary_contact_email: string;
           primary_contact_phone: string | null;
+          project_manager_id?: string | null;
           notes: string | null;
           created_at: string;
           updated_at: string;
@@ -97,6 +137,7 @@ export interface Database {
           primary_contact_name: string;
           primary_contact_email: string;
           primary_contact_phone?: string | null;
+          project_manager_id?: string | null;
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -108,6 +149,7 @@ export interface Database {
           primary_contact_name?: string;
           primary_contact_email?: string;
           primary_contact_phone?: string | null;
+          project_manager_id?: string | null;
           notes?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -121,6 +163,9 @@ export interface Database {
           first_name: string | null;
           last_name: string | null;
           role: OrbitRole;
+          job_role?: EmployeeJobRole | null;
+          status?: EmployeeStatus | null;
+          phone?: string | null;
           avatar_url: string | null;
           client_id: string | null;
           created_at: string;
@@ -132,6 +177,9 @@ export interface Database {
           first_name?: string | null;
           last_name?: string | null;
           role?: OrbitRole;
+          job_role?: EmployeeJobRole | null;
+          status?: EmployeeStatus | null;
+          phone?: string | null;
           avatar_url?: string | null;
           client_id?: string | null;
           created_at?: string;
@@ -143,6 +191,9 @@ export interface Database {
           first_name?: string | null;
           last_name?: string | null;
           role?: OrbitRole;
+          job_role?: EmployeeJobRole | null;
+          status?: EmployeeStatus | null;
+          phone?: string | null;
           avatar_url?: string | null;
           client_id?: string | null;
           created_at?: string;
@@ -384,8 +435,8 @@ export interface Database {
         Row: {
           id: string;
           client_id: string;
-          project_id: string;
-          deliverable_id: string;
+          project_id: string | null;
+          deliverable_id: string | null;
           title: string;
           description: string;
           status: ClientRequestStatus;
@@ -395,12 +446,17 @@ export interface Database {
           updated_at: string;
           resolved_at: string | null;
           resolved_by: string | null;
+          reference_number: string | null;
+          category: string;
+          payment_id: string | null;
+          meeting_id: string | null;
+          schedule_item_id: string | null;
         };
         Insert: {
           id?: string;
           client_id: string;
-          project_id: string;
-          deliverable_id: string;
+          project_id?: string | null;
+          deliverable_id?: string | null;
           title: string;
           description: string;
           status?: ClientRequestStatus;
@@ -410,12 +466,17 @@ export interface Database {
           updated_at?: string;
           resolved_at?: string | null;
           resolved_by?: string | null;
+          reference_number?: string | null;
+          category?: string;
+          payment_id?: string | null;
+          meeting_id?: string | null;
+          schedule_item_id?: string | null;
         };
         Update: {
           id?: string;
           client_id?: string;
-          project_id?: string;
-          deliverable_id?: string;
+          project_id?: string | null;
+          deliverable_id?: string | null;
           title?: string;
           description?: string;
           status?: ClientRequestStatus;
@@ -425,6 +486,11 @@ export interface Database {
           updated_at?: string;
           resolved_at?: string | null;
           resolved_by?: string | null;
+          reference_number?: string | null;
+          category?: string;
+          payment_id?: string | null;
+          meeting_id?: string | null;
+          schedule_item_id?: string | null;
         };
         Relationships: [
           {
@@ -458,6 +524,48 @@ export interface Database {
           {
             foreignKeyName: "client_requests_resolved_by_fkey";
             columns: ["resolved_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      request_messages: {
+        Row: {
+          id: string;
+          request_id: string;
+          sender_id: string;
+          message: string;
+          is_internal: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          request_id: string;
+          sender_id: string;
+          message: string;
+          is_internal?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          request_id?: string;
+          sender_id?: string;
+          message?: string;
+          is_internal?: boolean;
+          created_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "request_messages_request_id_fkey";
+            columns: ["request_id"];
+            isOneToOne: false;
+            referencedRelation: "client_requests";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "request_messages_sender_id_fkey";
+            columns: ["sender_id"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
@@ -769,6 +877,7 @@ export interface Database {
           transaction_reference: string | null;
           razorpay_order_id: string | null;
           razorpay_payment_id: string | null;
+          razorpay_signature: string | null;
           paid_at: string | null;
           verified_at: string | null;
           verified_by: string | null;
@@ -790,6 +899,7 @@ export interface Database {
           transaction_reference?: string | null;
           razorpay_order_id?: string | null;
           razorpay_payment_id?: string | null;
+          razorpay_signature?: string | null;
           paid_at?: string | null;
           verified_at?: string | null;
           verified_by?: string | null;
@@ -811,6 +921,7 @@ export interface Database {
           transaction_reference?: string | null;
           razorpay_order_id?: string | null;
           razorpay_payment_id?: string | null;
+          razorpay_signature?: string | null;
           paid_at?: string | null;
           verified_at?: string | null;
           verified_by?: string | null;
@@ -835,6 +946,13 @@ export interface Database {
             referencedColumns: ["id"];
           },
           {
+            foreignKeyName: "payments_created_by_fkey";
+            columns: ["created_by"];
+            isOneToOne: false;
+            referencedRelation: "profiles";
+            referencedColumns: ["id"];
+          },
+          {
             foreignKeyName: "payments_project_id_fkey";
             columns: ["project_id"];
             isOneToOne: false;
@@ -842,13 +960,37 @@ export interface Database {
             referencedColumns: ["id"];
           },
           {
-            foreignKeyName: "payments_created_by_fkey";
-            columns: ["created_by"];
+            foreignKeyName: "payments_verified_by_fkey";
+            columns: ["verified_by"];
             isOneToOne: false;
             referencedRelation: "profiles";
             referencedColumns: ["id"];
           }
         ];
+      };
+      razorpay_webhook_events: {
+        Row: {
+          id: string;
+          event_id: string;
+          event_type: string;
+          payload: Json;
+          processed_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          event_type: string;
+          payload: Json;
+          processed_at?: string;
+        };
+        Update: {
+          id?: string;
+          event_id?: string;
+          event_type?: string;
+          payload?: Json;
+          processed_at?: string;
+        };
+        Relationships: [];
       };
     };
     Views: {
