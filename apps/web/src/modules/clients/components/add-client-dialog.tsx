@@ -11,6 +11,7 @@ import { createClientSchema, type CreateClientInput } from "../schema";
 import { createClientAction } from "../actions";
 import type { ClientStatus } from "../types";
 import type { TeamMember } from "@/modules/team/types";
+import { formatPmRoleAndDepartment } from "@/modules/team/components/assign-pm-dialog";
 
 interface AddClientDialogProps {
   projectManagers?: TeamMember[];
@@ -298,7 +299,7 @@ export function AddClientDialog({ projectManagers = [] }: AddClientDialogProps) 
                     <option value="">-- Assign Later --</option>
                     {projectManagers.map((pm) => (
                       <option key={pm.id} value={pm.id}>
-                        {pm.first_name} {pm.last_name || ""}
+                        {pm.first_name} {pm.last_name || ""} — {formatPmRoleAndDepartment(pm)}
                       </option>
                     ))}
                   </select>

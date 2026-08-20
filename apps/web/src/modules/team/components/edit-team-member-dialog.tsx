@@ -31,6 +31,8 @@ export function EditTeamMemberDialog({
     first_name: member.first_name,
     last_name: member.last_name || "",
     job_role: member.job_role,
+    department: member.department || "",
+    is_project_manager: member.is_project_manager ?? false,
     status: member.status,
     phone: member.phone || "",
   });
@@ -41,6 +43,8 @@ export function EditTeamMemberDialog({
       first_name: member.first_name,
       last_name: member.last_name || "",
       job_role: member.job_role,
+      department: member.department || "",
+      is_project_manager: member.is_project_manager ?? false,
       status: member.status,
       phone: member.phone || "",
     });
@@ -80,6 +84,8 @@ export function EditTeamMemberDialog({
     payload.append("first_name", formData.first_name);
     if (formData.last_name) payload.append("last_name", formData.last_name);
     payload.append("job_role", formData.job_role);
+    if (formData.department) payload.append("department", formData.department);
+    payload.append("is_project_manager", String(formData.is_project_manager));
     payload.append("status", formData.status);
     if (formData.phone) payload.append("phone", formData.phone);
 
@@ -112,7 +118,7 @@ export function EditTeamMemberDialog({
           onClick={handleOpen}
           variant="outline"
           size="sm"
-          className="h-7 text-xs px-2.5 gap-1.5 border-border/80 hover:bg-secondary"
+          className="h-7 text-xs px-2.5 gap-1.5 border-border/80 hover:bg-secondary cursor-pointer"
         >
           <Edit2 className="h-3 w-3" />
           <span>Edit</span>
@@ -144,7 +150,7 @@ export function EditTeamMemberDialog({
                 type="button"
                 onClick={handleClose}
                 disabled={isLoading}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -200,33 +206,52 @@ export function EditTeamMemberDialog({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="edit_job_role" className="text-xs font-medium">
-                    Job Role *
+                    Job Function / Role *
                   </Label>
                   <select
                     id="edit_job_role"
                     value={formData.job_role}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const newRole = e.target.value as EmployeeJobRole;
                       setFormData((prev) => ({
                         ...prev,
-                        job_role: e.target.value as EmployeeJobRole,
-                      }))
-                    }
+                        job_role: newRole,
+                      }));
+                    }}
                     disabled={isLoading}
                     className="w-full h-8 px-2.5 text-xs rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
                     <option value="PROJECT_MANAGER">Project Manager</option>
                     <option value="DEVELOPER">Developer</option>
                     <option value="DESIGNER">Designer</option>
-                    <option value="CONTENT">Content</option>
+                    <option value="CONTENT">Content Specialist</option>
                     <option value="MARKETING">Marketing</option>
                     <option value="SALES">Sales</option>
-                    <option value="OTHER">Other</option>
+                    <option value="OTHER">Executive / General</option>
                   </select>
                   {fieldErrors.job_role && (
                     <p className="text-[11px] text-destructive">{fieldErrors.job_role}</p>
                   )}
                 </div>
 
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit_department" className="text-xs font-medium">
+                    Department (Optional)
+                  </Label>
+                  <Input
+                    id="edit_department"
+                    value={formData.department}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, department: e.target.value }))
+                    }
+                    placeholder="e.g. Admin, Content, Engineering"
+                    className="h-8 text-xs"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="edit_status" className="text-xs font-medium">
                     Status *
@@ -247,21 +272,57 @@ export function EditTeamMemberDialog({
                     <option value="INACTIVE">Inactive</option>
                   </select>
                 </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit_phone" className="text-xs font-medium">
+                    Phone Number (Optional)
+                  </Label>
+                  <Input
+                    id="edit_phone"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, phone: e.target.value }))
+                    }
+                    className="h-8 text-xs font-mono"
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="edit_phone" className="text-xs font-medium">
-                  Phone Number (Optional)
-                </Label>
-                <Input
-                  id="edit_phone"
-                  value={formData.phone}
+              {/* PM Eligibility Checkbox */}
+              <div className="rounded-xl border border-border/70 bg-secondary/30 p-3 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="edit_is_project_manager"
+                  checked={formData.is_project_manager}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, phone: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      is_project_manager: e.target.checked,
+                    }))
                   }
-                  className="h-8 text-xs font-mono"
                   disabled={isLoading}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
                 />
+                <div
+                  className="space-y-0.5 cursor-pointer"
+                  onClick={() =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      is_project_manager: !prev.is_project_manager,
+                    }))
+                  }
+                >
+                  <Label
+                    htmlFor="edit_is_project_manager"
+                    className="text-xs font-semibold text-foreground cursor-pointer"
+                  >
+                    Eligible for Client Project Manager Assignment
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Allows this team member to be assigned as primary Project Manager for clients.
+                  </p>
+                </div>
               </div>
 
               {/* Warning if deactivating a member with assigned clients */}

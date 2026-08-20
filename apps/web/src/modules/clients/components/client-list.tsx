@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Search, ChevronRight, Building2, Mail, Phone, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { OrbitAvatar } from "@/components/ui/orbit-avatar";
 import { ClientStatusBadge } from "./client-status-badge";
 import type { ClientWithPm, ClientStatus } from "../types";
 import type { TeamMember } from "@/modules/team/types";
@@ -198,9 +199,12 @@ export function ClientList({ initialClients }: ClientListProps) {
                       <td className="py-4 px-5">
                         {client.project_manager ? (
                           <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-primary/10 border border-primary/20 text-xs shadow-xs">
-                            <div className="h-5 w-5 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-[10px] shrink-0">
-                              {client.project_manager.first_name[0]}
-                            </div>
+                            <OrbitAvatar
+                              src={client.project_manager.avatar_url}
+                              name={`${client.project_manager.first_name} ${client.project_manager.last_name || ""}`}
+                              size="xs"
+                              className="shrink-0"
+                            />
                             <span className="font-medium text-foreground whitespace-nowrap">
                               {client.project_manager.first_name}{" "}
                               {client.project_manager.last_name || ""}

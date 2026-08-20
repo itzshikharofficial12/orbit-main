@@ -18,6 +18,9 @@ export interface TeamMember {
   last_name: string | null;
   role: "SUPER_ADMIN" | "EMPLOYEE" | "CLIENT";
   job_role: EmployeeJobRole;
+  department?: string | null;
+  bio?: string | null;
+  is_project_manager: boolean;
   status: EmployeeStatus;
   phone: string | null;
   avatar_url: string | null;

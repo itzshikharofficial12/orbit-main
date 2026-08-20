@@ -4,6 +4,8 @@ import { OrbitShell } from "@/components/layout/orbit-shell";
 import { getTeamMembers, getTeamStats } from "@/modules/team/data";
 import { TeamMemberList } from "@/modules/team/components/team-member-list";
 
+import { AddTeamMemberDialog } from "@/modules/team/components/add-team-member-dialog";
+
 export const metadata = {
   title: "Team Directory — Orbit by Celestia Studios",
   description: "Manage Celestia Studios team members and client responsibilities.",
@@ -28,10 +30,14 @@ export default async function HqTeamPage() {
   ]);
 
   return (
-    <OrbitShell profile={profile} basePath="/hq">
-      <div className="max-w-7xl mx-auto space-y-8">
-        <TeamMemberList initialMembers={members} stats={stats} />
-      </div>
+    <OrbitShell
+      profile={profile}
+      basePath="/hq"
+      title="Team Directory"
+      description="Manage Celestia Studios team members and client responsibilities."
+      actions={<AddTeamMemberDialog />}
+    >
+      <TeamMemberList initialMembers={members} stats={stats} />
     </OrbitShell>
   );
 }

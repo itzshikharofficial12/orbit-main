@@ -11,75 +11,25 @@
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/layout.js"
     ],
-    "/(dashboard)/hq/clients/page": [
+    "/(dashboard)/client/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/hq/clients/page.js"
-    ],
-    "/(auth)/login/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/login/page.js"
+      "static/chunks/app/(dashboard)/client/page.js"
     ],
     "/(dashboard)/hq/clients/[clientId]/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
       "static/chunks/app/(dashboard)/hq/clients/[clientId]/page.js"
     ],
-    "/(dashboard)/hq/page": [
+    "/(auth)/login/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/hq/page.js"
+      "static/chunks/app/(auth)/login/page.js"
     ],
-    "/(dashboard)/hq/meetings/page": [
+    "/(dashboard)/hq/settings/page": [
       "static/chunks/webpack.js",
       "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/hq/meetings/page.js"
-    ],
-    "/(dashboard)/client/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/client/page.js"
-    ],
-    "/(dashboard)/client/meetings/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/client/meetings/page.js"
-    ],
-    "/(dashboard)/client/requests/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/client/requests/page.js"
-    ],
-    "/(dashboard)/client/notifications/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/client/notifications/page.js"
-    ],
-    "/(dashboard)/client/payments/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/client/payments/page.js"
-    ],
-    "/(dashboard)/client/payments/[invoiceId]/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(dashboard)/client/payments/[invoiceId]/page.js"
-    ],
-    "/api/payments/invoices/[invoiceId]/pdf/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/api/payments/invoices/[invoiceId]/pdf/route.js"
-    ],
-    "/(auth)/set-password/page": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/(auth)/set-password/page.js"
-    ],
-    "/auth/confirm/route": [
-      "static/chunks/webpack.js",
-      "static/chunks/main-app.js",
-      "static/chunks/app/auth/confirm/route.js"
+      "static/chunks/app/(dashboard)/hq/settings/page.js"
     ]
   }
 }

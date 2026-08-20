@@ -164,8 +164,11 @@ export interface Database {
           last_name: string | null;
           role: OrbitRole;
           job_role?: EmployeeJobRole | null;
+          department?: string | null;
+          bio?: string | null;
           status?: EmployeeStatus | null;
           phone?: string | null;
+          is_project_manager?: boolean;
           avatar_url: string | null;
           client_id: string | null;
           created_at: string;
@@ -178,8 +181,11 @@ export interface Database {
           last_name?: string | null;
           role?: OrbitRole;
           job_role?: EmployeeJobRole | null;
+          department?: string | null;
+          bio?: string | null;
           status?: EmployeeStatus | null;
           phone?: string | null;
+          is_project_manager?: boolean;
           avatar_url?: string | null;
           client_id?: string | null;
           created_at?: string;
@@ -192,8 +198,11 @@ export interface Database {
           last_name?: string | null;
           role?: OrbitRole;
           job_role?: EmployeeJobRole | null;
+          department?: string | null;
+          bio?: string | null;
           status?: EmployeeStatus | null;
           phone?: string | null;
+          is_project_manager?: boolean;
           avatar_url?: string | null;
           client_id?: string | null;
           created_at?: string;
@@ -205,6 +214,41 @@ export interface Database {
             columns: ["client_id"];
             isOneToOne: false;
             referencedRelation: "clients";
+            referencedColumns: ["id"];
+          }
+        ];
+      };
+      user_preferences: {
+        Row: {
+          user_id: string;
+          in_app_notifications: boolean;
+          notification_sound: boolean;
+          email_notifications: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          user_id: string;
+          in_app_notifications?: boolean;
+          notification_sound?: boolean;
+          email_notifications?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          in_app_notifications?: boolean;
+          notification_sound?: boolean;
+          email_notifications?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "user_preferences_user_id_fkey";
+            columns: ["user_id"];
+            isOneToOne: true;
+            referencedRelation: "profiles";
             referencedColumns: ["id"];
           }
         ];
@@ -1033,6 +1077,10 @@ export interface Database {
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 export type ProfileInsert = Database["public"]["Tables"]["profiles"]["Insert"];
 export type ProfileUpdate = Database["public"]["Tables"]["profiles"]["Update"];
+
+export type UserPreferences = Database["public"]["Tables"]["user_preferences"]["Row"];
+export type UserPreferencesInsert = Database["public"]["Tables"]["user_preferences"]["Insert"];
+export type UserPreferencesUpdate = Database["public"]["Tables"]["user_preferences"]["Update"];
 
 export type Client = Database["public"]["Tables"]["clients"]["Row"];
 export type ClientInsert = Database["public"]["Tables"]["clients"]["Insert"];

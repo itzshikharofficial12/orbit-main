@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createServerClient } from "@/lib/supabase/server";
+import { createServerClient, getAuthenticatedProfile } from "@/lib/supabase/server";
 import { getAdminClient } from "@/lib/supabase/admin";
 import {
   createClientSchema,
@@ -67,6 +67,7 @@ export async function createClientAction(formData: FormData): Promise<ClientActi
       primary_contact_email: validation.data.primary_contact_email,
       primary_contact_phone: validation.data.primary_contact_phone || null,
       status: validation.data.status,
+      project_manager_id: pmId,
       notes: finalNotes,
     };
 
@@ -199,6 +200,7 @@ export async function updateClientAction(
       primary_contact_email: validation.data.primary_contact_email,
       primary_contact_phone: validation.data.primary_contact_phone || null,
       status: validation.data.status,
+      project_manager_id: pmId,
       notes: finalNotes,
       updated_at: new Date().toISOString(),
     };
@@ -426,28 +428,80 @@ export async function unlinkClientUserAction(
   }
 
   try {
-    const supabase = await createServerClient();
-    const { error } = await supabase
-      .from("profiles")
-      .update({
-        client_id: null,
-        updated_at: new Date().toISOString(),
-      } as never)
-      .eq("id", profileId);
-
-    if (error) {
+    // 1. Authorize calling user (must be Super Admin or Employee)
+    const caller = await getAuthenticatedProfile();
+    if (!caller || (caller.role !== "SUPER_ADMIN" && caller.role !== "EMPLOYEE")) {
       return {
         success: false,
-        error: error.message || "Failed to remove portal access.",
+        error: "Unauthorized. Admin permissions required to manage portal access.",
       };
     }
 
+    const adminClient = getAdminClient();
+    const dbClient = (adminClient || (await createServerClient())) as any;
+
+    // 2. Fetch target profile
+    const { data: profile, error: profileErr } = await dbClient
+      .from("profiles")
+      .select("id, client_id, email, role")
+      .eq("id", profileId)
+      .maybeSingle();
+
+    if (profileErr) {
+      return {
+        success: false,
+        error: profileErr.message || "Failed to find client profile.",
+      };
+    }
+
+    // 3. Idempotent check: if already unlinked or profile doesn't exist
+    if (!profile || !profile.client_id) {
+      revalidatePath(`/hq/clients/${clientId}`);
+      revalidatePath("/hq/clients");
+      return {
+        success: true,
+        message: "Portal access is already disabled.",
+      };
+    }
+
+    // 4. Unlink profile client_id to immediately revoke portal access
+    const { error: updateError } = await dbClient
+      .from("profiles")
+      .update({
+        client_id: null,
+        status: "INACTIVE",
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", profileId);
+
+    if (updateError) {
+      return {
+        success: false,
+        error: updateError.message || "Failed to remove portal access.",
+      };
+    }
+
+    // 5. Update user metadata in Supabase Auth Admin
+    if (adminClient) {
+      try {
+        await adminClient.auth.admin.updateUserById(profileId, {
+          user_metadata: {
+            role: "CLIENT",
+            client_id: null,
+          },
+        });
+      } catch (authErr) {
+        console.warn("Notice updating auth metadata on access removal:", authErr);
+      }
+    }
+
+    // 6. Revalidate cache
     revalidatePath(`/hq/clients/${clientId}`);
     revalidatePath("/hq/clients");
 
     return {
       success: true,
-      message: "Portal access removed.",
+      message: "Portal access removed successfully.",
     };
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "An unexpected error occurred";

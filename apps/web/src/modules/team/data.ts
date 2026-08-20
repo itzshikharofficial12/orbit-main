@@ -133,6 +133,19 @@ export async function getTeamMembers(filters?: {
 
       const phone = (p as any).phone || meta.phone || null;
 
+      const isProjectManager: boolean = Boolean(
+        (p as any).is_project_manager ??
+        meta.is_project_manager ??
+        (jobRole === "PROJECT_MANAGER")
+      );
+
+      const department: string | null =
+        (p as any).department ||
+        meta.department ||
+        (p.role === "SUPER_ADMIN" ? "Admin" : null);
+
+      const bio: string | null = (p as any).bio || meta.bio || null;
+
       const assignedClients = pmClientsMap[p.id] || [];
 
       members.push({
@@ -142,6 +155,9 @@ export async function getTeamMembers(filters?: {
         last_name: p.last_name || meta.last_name || null,
         role: (meta.role as any) || (p.role as any) || "EMPLOYEE",
         job_role: jobRole,
+        department: department,
+        bio: bio,
+        is_project_manager: isProjectManager,
         status: status,
         phone: phone,
         avatar_url: p.avatar_url,
@@ -183,9 +199,8 @@ export async function getTeamMembers(filters?: {
 export async function getActiveProjectManagers(): Promise<TeamMember[]> {
   const members = await getTeamMembers({
     status: "ACTIVE",
-    job_role: "PROJECT_MANAGER",
   });
-  return members;
+  return members.filter((m) => m.is_project_manager === true);
 }
 
 export async function getTeamMemberById(id: string): Promise<TeamMember | null> {
@@ -202,7 +217,7 @@ export async function getClientProjectManager(
     const supabase = await createServerClient();
     const { data: client, error } = await supabase
       .from("clients")
-      .select("id, notes")
+      .select("id, project_manager_id, notes")
       .eq("id", clientId)
       .single();
 
@@ -226,13 +241,13 @@ export async function getTeamStats(): Promise<TeamStats> {
     total: members.length,
     active: activeMembers.length,
     project_managers: activeMembers.filter(
-      (m) => m.job_role === "PROJECT_MANAGER"
+      (m) => m.is_project_manager
     ).length,
     developers: activeMembers.filter((m) => m.job_role === "DEVELOPER").length,
     designers: activeMembers.filter((m) => m.job_role === "DESIGNER").length,
     other: activeMembers.filter(
       (m) =>
-        m.job_role !== "PROJECT_MANAGER" &&
+        !m.is_project_manager &&
         m.job_role !== "DEVELOPER" &&
         m.job_role !== "DESIGNER"
     ).length,

@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowLeft, Building2, Calendar, CheckCircle2, Clock, CircleDot, AlertCircle } from "lucide-react";
 import { getAuthenticatedProfile } from "@/lib/supabase/server";
 import { OrbitShell } from "@/components/layout/orbit-shell";
+import { NotificationCenter } from "@/modules/notifications/components/notification-center";
 import { getClientProjectById } from "@/modules/projects/data";
 import { getClientVisibleDeliverablesByProjectId } from "@/modules/deliverables/data";
 import { getClientRequestsByProjectId } from "@/modules/requests/data";
@@ -155,26 +156,26 @@ export default async function ClientProjectDetailPage({ params }: ClientProjectD
     <OrbitShell
       profile={profile}
       basePath="/client"
-      title={project.name}
-      description="Client engagement workspace."
+      hideHeader={true}
     >
       <div className="space-y-8">
         {/* Navigation & Header */}
         <div className="space-y-4">
-          <div>
+          <div className="flex items-center justify-between">
             <Link
               href="/client"
-              className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group"
             >
               <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
               <span>Back to Overview</span>
             </Link>
+            <NotificationCenter />
           </div>
 
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-border/40">
-            <div className="space-y-2">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5 pb-5 border-b border-border/50">
+            <div className="space-y-2 min-w-0">
               <div className="flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+                <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground truncate">
                   {project.name}
                 </h1>
                 <ProjectStatusBadge status={project.status} />
@@ -192,15 +193,15 @@ export default async function ClientProjectDetailPage({ params }: ClientProjectD
               )}
             </div>
 
-            <div className="flex items-center gap-4 text-xs text-muted-foreground font-mono">
+            <div className="flex items-center gap-6 text-xs font-mono shrink-0">
               {project.start_date && (
                 <div>
-                  <span className="text-muted-foreground block text-[10px] uppercase">Start Date</span>
+                  <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Start Date</span>
                   <span className="text-foreground">{formatDate(project.start_date)}</span>
                 </div>
               )}
               <div>
-                <span className="text-muted-foreground block text-[10px] uppercase">Target Delivery</span>
+                <span className="text-muted-foreground block text-[10px] uppercase font-semibold">Target Delivery</span>
                 <span className="text-foreground font-medium">{formatDate(project.target_date)}</span>
               </div>
             </div>
@@ -209,8 +210,13 @@ export default async function ClientProjectDetailPage({ params }: ClientProjectD
 
         {/* Project Description (if any) */}
         {project.description && (
-          <div className="p-4 rounded-lg border border-border/60 bg-secondary/20 text-xs text-muted-foreground leading-relaxed">
-            {project.description}
+          <div className="rounded-xl border border-border/70 bg-card p-5 space-y-1.5 shadow-xs">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold block">
+              About This Project
+            </span>
+            <p className="text-xs text-foreground/90 leading-relaxed">
+              {project.description}
+            </p>
           </div>
         )}
 

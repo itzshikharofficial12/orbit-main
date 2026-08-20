@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { AddTeamMemberDialog } from "./add-team-member-dialog";
+import { OrbitAvatar } from "@/components/ui/orbit-avatar";
 import { EditTeamMemberDialog } from "./edit-team-member-dialog";
 import type { TeamMember, TeamStats, EmployeeJobRole, EmployeeStatus } from "../types";
 
@@ -127,21 +127,7 @@ export function TeamMemberList({
 
   return (
     <div className="space-y-8">
-      {/* 1. Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Team</h1>
-          <p className="text-xs text-muted-foreground">
-            Manage the Celestia Studios team and client responsibilities.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5">
-          <AddTeamMemberDialog />
-        </div>
-      </div>
-
-      {/* 2. Top Summary Metric Cards */}
+      {/* 1. Top Summary Metric Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         <div className="rounded-2xl border border-border/70 bg-card p-5 space-y-1 shadow-sm">
           <div className="flex items-center justify-between text-muted-foreground">
@@ -273,9 +259,12 @@ export function TeamMemberList({
                       {/* Name & Contact */}
                       <td className="py-4 px-5">
                         <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-xs border border-primary/20 shrink-0">
-                            {initial}
-                          </div>
+                          <OrbitAvatar
+                            src={member.avatar_url}
+                            name={`${member.first_name} ${member.last_name || ""}`}
+                            size="md"
+                            className="shrink-0"
+                          />
                           <div className="space-y-0.5 min-w-0">
                             <div className="flex items-center gap-2">
                               <span className="font-semibold text-foreground truncate text-sm">
@@ -289,9 +278,22 @@ export function TeamMemberList({
                                   Admin
                                 </Badge>
                               )}
+                              {member.is_project_manager && member.job_role !== "PROJECT_MANAGER" && (
+                                <Badge
+                                  variant="outline"
+                                  className="text-[9px] font-mono px-1.5 py-0 border-emerald-500/30 text-emerald-400 bg-emerald-500/10"
+                                >
+                                  PM Eligible
+                                </Badge>
+                              )}
                             </div>
                             <div className="flex items-center gap-3 text-muted-foreground text-[11px]">
                               <span className="truncate">{member.email}</span>
+                              {member.department && (
+                                <span className="hidden sm:inline font-sans text-muted-foreground/80">
+                                  · {member.department}
+                                </span>
+                              )}
                               {member.phone && (
                                 <span className="hidden sm:inline font-mono">
                                   · {member.phone}
@@ -303,7 +305,17 @@ export function TeamMemberList({
                       </td>
 
                       {/* Job Role */}
-                      <td className="py-4 px-5">{getJobRoleBadge(member.job_role)}</td>
+                      <td className="py-4 px-5">
+                        <div className="space-y-1">
+                          {getJobRoleBadge(member.job_role)}
+                          {member.is_project_manager && (
+                            <div className="text-[10px] text-muted-foreground flex items-center gap-1">
+                              <span className="h-1 w-1 rounded-full bg-emerald-400" />
+                              <span>PM Assignable</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
 
                       {/* Status */}
                       <td className="py-4 px-5">

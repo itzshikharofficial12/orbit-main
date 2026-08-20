@@ -32,7 +32,6 @@ export function SetPasswordForm({
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
   const [successMessage, setSuccessMessage] = React.useState<string | null>(null);
   const [isLoading, setIsLoading] = React.useState(false);
-  // Always start with verification to allow parsing URL hash tokens before showing any error
   const [isVerifyingSession, setIsVerifyingSession] = React.useState(true);
   const [sessionError, setSessionError] = React.useState<string | null>(null);
   const [userEmail, setUserEmail] = React.useState<string | null>(initialEmail || null);
@@ -61,11 +60,15 @@ export function SetPasswordForm({
         const queryErrorCode = searchParams.get("error_code");
         const queryErrorDescription = searchParams.get("error_description") || initialErrorDescription;
 
+        // Check for explicit error returned by Supabase Auth in hash or query
+        const explicitError = hashErrorCode || hashError || queryErrorCode || queryError;
+        const explicitDesc = hashErrorDescription || queryErrorDescription;
+
         // 2. If access_token is present in URL hash, establish Supabase session
         if (hashAccessToken) {
           const { data: sessionData, error: sessionErr } = await supabase.auth.setSession({
             access_token: hashAccessToken,
-            refresh_token: hashRefreshToken || "",
+            refresh_token: hashRefreshToken || hashAccessToken,
           });
 
           if (!sessionErr && sessionData.session?.user) {
@@ -75,7 +78,7 @@ export function SetPasswordForm({
               setIsVerifyingSession(false);
             }
 
-            // Remove sensitive access token fragment and any error query params from address bar
+            // Remove sensitive access token fragment from browser address bar
             try {
               window.history.replaceState(null, "", window.location.pathname);
             } catch {
@@ -121,6 +124,21 @@ export function SetPasswordForm({
         }
 
         // 5. Check existing active Supabase session or authenticated user
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (sessionData.session?.user) {
+          if (isMounted) {
+            setUserEmail(sessionData.session.user.email || null);
+            setSessionError(null);
+            setIsVerifyingSession(false);
+          }
+          if (window.location.hash || window.location.search) {
+            try {
+              window.history.replaceState(null, "", window.location.pathname);
+            } catch {}
+          }
+          return;
+        }
+
         const { data: { user: currentUser }, error: userErr } = await supabase.auth.getUser();
         if (!userErr && currentUser) {
           if (isMounted) {
@@ -154,9 +172,6 @@ export function SetPasswordForm({
         );
 
         // 7. If no valid session could be established, resolve the error description
-        const explicitError = hashErrorCode || hashError || queryErrorCode || queryError;
-        const explicitDesc = hashErrorDescription || queryErrorDescription;
-
         let displayError = "This invitation link has expired or has already been used. Please request a fresh invitation from Celestia Studios.";
         if (explicitError === "access_denied" && explicitDesc?.toLowerCase().includes("expired")) {
           displayError = "This invitation link has expired or has already been used. Please request a fresh invitation from Celestia Studios.";
@@ -177,7 +192,7 @@ export function SetPasswordForm({
           clearTimeout(timer);
           authListener.subscription.unsubscribe();
         };
-      } catch (err) {
+      } catch {
         if (isMounted) {
           setSessionError(
             "This invitation link has expired or has already been used. Please request a fresh invitation from Celestia Studios."
@@ -214,6 +229,22 @@ export function SetPasswordForm({
 
     try {
       const supabase = createBrowserClient();
+
+      // 1. Verify active session exists before attempting password update
+      const { data: sessionData } = await supabase.auth.getSession();
+      let activeUser = sessionData.session?.user || null;
+      if (!activeUser) {
+        const { data: userData } = await supabase.auth.getUser();
+        activeUser = userData.user || null;
+      }
+
+      if (!activeUser) {
+        setErrorMessage("Your invitation session has expired. Please request a fresh invitation from Celestia Studios.");
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Update password via Supabase Auth
       const { data, error } = await supabase.auth.updateUser({
         password: formData.password,
       });
@@ -230,11 +261,15 @@ export function SetPasswordForm({
         return;
       }
 
-      setSuccessMessage("Password established successfully. Opening your workspace...");
+      // 3. Resolve role and determine correct portal destination
+      const userRole = data.user.user_metadata?.role || "CLIENT";
+      const targetUrl = userRole === "SUPER_ADMIN" || userRole === "EMPLOYEE" ? "/hq" : "/client";
+
+      setSuccessMessage("Account created successfully. Opening your workspace...");
       setIsLoading(false);
 
       setTimeout(() => {
-        window.location.href = "/client";
+        window.location.href = targetUrl;
       }, 1000);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "An unexpected error occurred.";

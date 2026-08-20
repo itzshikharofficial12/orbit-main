@@ -2,7 +2,9 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { ArrowLeft, UserCheck, AlertCircle, Edit3, UserPlus } from "lucide-react";
+import { ArrowLeft, UserCheck, AlertCircle, Edit3, UserPlus, Building2 } from "lucide-react";
+import { OrbitAvatar } from "@/components/ui/orbit-avatar";
+import { NotificationCenter } from "@/modules/notifications/components/notification-center";
 import { ClientStatusBadge } from "./client-status-badge";
 import { AssignPmDialog } from "@/modules/team/components/assign-pm-dialog";
 import { updateClientStatusAction } from "../actions";
@@ -34,31 +36,38 @@ export function ClientDetailHeader({ client, projectManagers = [] }: ClientDetai
 
   return (
     <div className="space-y-4">
-      {/* Back Navigation */}
-      <div>
+      {/* Back Navigation & Utilities */}
+      <div className="flex items-center justify-between">
         <Link
           href="/hq/clients"
-          className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group"
         >
           <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
           <span>Back to Clients</span>
         </Link>
+        <NotificationCenter />
       </div>
 
-      {/* Main Title & Quick Info Bar */}
-      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 pb-4 border-b border-border/40">
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {client.name}
-            </h1>
-            <ClientStatusBadge status={currentStatus} />
+      {/* Primary Authoritative Client Identity Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5 pb-5 border-b border-border/50">
+        <div className="flex items-center gap-4 min-w-0">
+          <div className="h-11 w-11 rounded-xl bg-primary/10 border border-primary/20 text-primary flex items-center justify-center font-bold text-base shrink-0 shadow-xs">
+            {client.name[0]?.toUpperCase() || "C"}
           </div>
 
-          <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-            <span className="font-mono">ID: {client.id}</span>
-            <span>•</span>
-            <span>Contact: {client.primary_contact_name} ({client.primary_contact_email})</span>
+          <div className="space-y-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground truncate">
+                {client.name}
+              </h1>
+              <ClientStatusBadge status={currentStatus} />
+            </div>
+
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              <span className="font-mono">ID: {client.id}</span>
+              <span>•</span>
+              <span>Contact: {client.primary_contact_name} ({client.primary_contact_email})</span>
+            </div>
           </div>
         </div>
 
@@ -67,9 +76,12 @@ export function ClientDetailHeader({ client, projectManagers = [] }: ClientDetai
           {/* Primary PM Chip */}
           {client.project_manager ? (
             <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-primary/10 border border-primary/25 shadow-sm text-xs">
-              <div className="h-6 w-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center font-bold text-[11px] shrink-0 shadow-sm">
-                {client.project_manager.first_name[0]}
-              </div>
+              <OrbitAvatar
+                src={client.project_manager.avatar_url}
+                name={`${client.project_manager.first_name} ${client.project_manager.last_name || ""}`}
+                size="xs"
+                className="shrink-0"
+              />
               <div className="flex flex-col">
                 <span className="text-[10px] uppercase font-mono text-muted-foreground leading-tight">Primary PM</span>
                 <span className="font-semibold text-foreground leading-tight">

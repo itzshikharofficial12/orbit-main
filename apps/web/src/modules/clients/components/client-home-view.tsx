@@ -19,6 +19,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { OrbitAvatar } from "@/components/ui/orbit-avatar";
 import { ProjectStatusBadge } from "@/modules/projects/components/project-status-badge";
 import { ServiceTypeBadge } from "@/modules/projects/components/service-type-badge";
 import { ProjectProgressBar } from "@/modules/projects/components/project-progress-bar";
@@ -164,9 +165,12 @@ export function ClientHomeView({
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="flex items-center gap-4 min-w-0">
               <div className="relative shrink-0">
-                <div className="h-12 w-12 rounded-full bg-primary/15 text-primary flex items-center justify-center font-bold text-base border border-primary/30 shadow-inner">
-                  {client.project_manager.first_name[0]?.toUpperCase() || "P"}
-                </div>
+                <OrbitAvatar
+                  src={client.project_manager.avatar_url}
+                  name={`${client.project_manager.first_name} ${client.project_manager.last_name || ""}`}
+                  size="lg"
+                  className="ring-1 ring-border/80 shadow-xs"
+                />
                 <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-emerald-500 border-2 border-card" title="Active Project Lead" />
               </div>
 

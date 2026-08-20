@@ -2,9 +2,22 @@ import { createBrowserClient as createSupabaseBrowserClient } from "@supabase/ss
 import type { Database } from "./types";
 import { env } from "@/lib/env";
 
+let browserClient: ReturnType<typeof createSupabaseBrowserClient<Database>> | undefined;
+
 export function createBrowserClient() {
-  return createSupabaseBrowserClient<Database>(
-    env.supabaseUrl,
-    env.supabaseAnonKey
-  );
+  if (typeof window === "undefined") {
+    return createSupabaseBrowserClient<Database>(
+      env.supabaseUrl,
+      env.supabaseAnonKey
+    );
+  }
+
+  if (!browserClient) {
+    browserClient = createSupabaseBrowserClient<Database>(
+      env.supabaseUrl,
+      env.supabaseAnonKey
+    );
+  }
+
+  return browserClient;
 }

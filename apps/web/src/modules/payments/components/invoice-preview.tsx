@@ -100,7 +100,7 @@ export function InvoicePreview({
         {/* 1. Header */}
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 pb-6 border-b border-border/50">
           <div className="space-y-1">
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">ORBIT</h1>
+            <div className="text-2xl font-bold tracking-tight text-foreground">ORBIT</div>
             <p className="text-xs font-medium text-muted-foreground">by Celestia Studios</p>
             <div className="text-[11px] text-muted-foreground pt-2 space-y-0.5 font-mono">
               <p>{CELESTIA_COMPANY_INFO.tagline}</p>

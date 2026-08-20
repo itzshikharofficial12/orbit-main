@@ -3,6 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { ArrowLeft, Building2, Calendar, Target, LayoutGrid, Flag, CheckSquare, Package, CreditCard } from "lucide-react";
+import { NotificationCenter } from "@/modules/notifications/components/notification-center";
 import { ProjectStatusBadge } from "./project-status-badge";
 import { ServiceTypeBadge } from "./service-type-badge";
 import { EditProjectDialog } from "./edit-project-dialog";
@@ -99,23 +100,24 @@ export function ProjectDetailHeader({
 
   return (
     <div className="space-y-6">
-      {/* Back to Projects */}
-      <div>
+      {/* Back to Projects & Utilities */}
+      <div className="flex items-center justify-between">
         <Link
           href="/hq/projects"
-          className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group"
+          className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors group"
         >
           <ArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
           <span>Back to Projects</span>
         </Link>
+        <NotificationCenter />
       </div>
 
-      {/* Main Header Bar */}
+      {/* Project Status & Metadata Bar */}
       <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-5 pb-5 border-b border-border/40">
-        <div className="space-y-3">
-          {/* Title and Badges */}
+        <div className="space-y-2.5 min-w-0">
+          {/* Badges & Identity */}
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground truncate">
               {project.name}
             </h1>
             <ProjectStatusBadge status={currentStatus} />

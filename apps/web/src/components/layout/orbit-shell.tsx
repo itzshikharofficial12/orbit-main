@@ -9,6 +9,7 @@ interface OrbitShellProps {
   title?: string;
   description?: string;
   actions?: React.ReactNode;
+  hideHeader?: boolean;
   children: React.ReactNode;
 }
 
@@ -18,6 +19,7 @@ export function OrbitShell({
   title,
   description,
   actions,
+  hideHeader = false,
   children,
 }: OrbitShellProps) {
   const firstName = profile?.first_name || "there";
@@ -35,22 +37,24 @@ export function OrbitShell({
       {/* Main Workspace Area */}
       <main className="flex-1 flex flex-col min-w-0 overflow-y-auto">
         {/* Top Header */}
-        <header className="px-6 sm:px-10 py-7 border-b border-border/60 bg-background/40">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="space-y-1">
-              <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
-                {title || defaultTitle}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {description || defaultDescription}
-              </p>
+        {!hideHeader && (
+          <header className="px-6 sm:px-10 py-7 border-b border-border/60 bg-background/40">
+            <div className="max-w-7xl mx-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="space-y-1">
+                <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground">
+                  {title || defaultTitle}
+                </h1>
+                <p className="text-sm text-muted-foreground">
+                  {description || defaultDescription}
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                {actions}
+                <NotificationCenter />
+              </div>
             </div>
-            <div className="flex items-center gap-3">
-              {actions}
-              <NotificationCenter />
-            </div>
-          </div>
-        </header>
+          </header>
+        )}
 
         {/* Content View */}
         <div className="flex-1 p-6 sm:p-10">

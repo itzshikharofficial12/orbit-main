@@ -189,16 +189,8 @@ export function AdminPaymentsDirectory({
 
   return (
     <div className="space-y-6">
-      {/* 1. Top Heading & Quick Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground">Payments</h1>
-          <p className="text-xs text-muted-foreground">
-            Manage billing, invoices, collections and outstanding payments.
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2">
+      {/* 1. Quick Actions */}
+      <div className="flex items-center justify-end gap-2">
           <RecordPaymentDialog
             plans={initialPlans}
             clients={clients}
@@ -226,7 +218,6 @@ export function AdminPaymentsDirectory({
             }
           />
         </div>
-      </div>
 
       {/* 2. Financial Summary Cards (6 Top Metrics) */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

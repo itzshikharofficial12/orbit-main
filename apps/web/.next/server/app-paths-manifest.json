@@ -1,10 +1,5 @@
 {
-  "/auth/confirm/route": "app/auth/confirm/route.js",
-  "/(auth)/set-password/page": "app/(auth)/set-password/page.js",
-  "/(auth)/login/page": "app/(auth)/login/page.js",
-  "/(dashboard)/hq/meetings/page": "app/(dashboard)/hq/meetings/page.js",
-  "/(dashboard)/client/payments/page": "app/(dashboard)/client/payments/page.js",
-  "/(dashboard)/client/payments/[invoiceId]/page": "app/(dashboard)/client/payments/[invoiceId]/page.js",
-  "/(dashboard)/client/requests/page": "app/(dashboard)/client/requests/page.js",
-  "/(dashboard)/client/page": "app/(dashboard)/client/page.js"
+  "/(dashboard)/hq/clients/[clientId]/page": "app/(dashboard)/hq/clients/[clientId]/page.js",
+  "/(dashboard)/client/page": "app/(dashboard)/client/page.js",
+  "/(dashboard)/hq/settings/page": "app/(dashboard)/hq/settings/page.js"
 }

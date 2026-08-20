@@ -146,6 +146,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../src/app/(dashboard)/client/settings/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/client/settings">> = Specific
+  const handler = {} as typeof import("../../src/app/(dashboard)/client/settings/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../src/app/(dashboard)/hq/clients/[clientId]/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/hq/clients/[clientId]">> = Specific
@@ -236,6 +245,15 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
   type __Unused = __Check
 }
 
+// Validate ../../src/app/(dashboard)/hq/settings/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/hq/settings">> = Specific
+  const handler = {} as typeof import("../../src/app/(dashboard)/hq/settings/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
 // Validate ../../src/app/(dashboard)/hq/team/page.tsx
 {
   type __IsExpected<Specific extends AppPageConfig<"/hq/team">> = Specific
@@ -249,6 +267,24 @@ type RouteHandlerConfig<Route extends AppRouteHandlerRoutes = AppRouteHandlerRou
 {
   type __IsExpected<Specific extends AppPageConfig<"/">> = Specific
   const handler = {} as typeof import("../../src/app/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/settings/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/settings">> = Specific
+  const handler = {} as typeof import("../../src/app/settings/page.js")
+  type __Check = __IsExpected<typeof handler>
+  // @ts-ignore
+  type __Unused = __Check
+}
+
+// Validate ../../src/app/settings/profile/page.tsx
+{
+  type __IsExpected<Specific extends AppPageConfig<"/settings/profile">> = Specific
+  const handler = {} as typeof import("../../src/app/settings/profile/page.js")
   type __Check = __IsExpected<typeof handler>
   // @ts-ignore
   type __Unused = __Check

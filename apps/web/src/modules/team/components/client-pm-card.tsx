@@ -4,7 +4,8 @@ import * as React from "react";
 import { UserCheck, Mail, Phone, AlertCircle, ArrowRight } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { AssignPmDialog } from "./assign-pm-dialog";
+import { OrbitAvatar } from "@/components/ui/orbit-avatar";
+import { AssignPmDialog, formatPmRoleAndDepartment } from "./assign-pm-dialog";
 import type { TeamMember } from "../types";
 
 interface ClientPmCardProps {
@@ -57,15 +58,18 @@ export function ClientPmCard({
           <div className="rounded-xl border border-border/60 bg-secondary/30 p-4 space-y-3">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold border border-primary/20 shrink-0">
-                  {currentPm.first_name[0]}
-                </div>
+                <OrbitAvatar
+                  src={currentPm.avatar_url}
+                  name={`${currentPm.first_name} ${currentPm.last_name || ""}`}
+                  size="lg"
+                  className="shrink-0"
+                />
                 <div className="min-w-0">
                   <h4 className="text-sm font-semibold text-foreground truncate">
                     {currentPm.first_name} {currentPm.last_name || ""}
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    Project Manager · Celestia Studios
+                    {formatPmRoleAndDepartment(currentPm)} · Celestia Studios
                   </p>
                 </div>
               </div>

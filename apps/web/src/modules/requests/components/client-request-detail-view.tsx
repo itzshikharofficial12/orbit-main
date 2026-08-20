@@ -162,9 +162,9 @@ export function ClientRequestDetailView({
             )}
           </div>
 
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">
+          <h2 className="text-lg sm:text-xl font-bold tracking-tight text-foreground">
             {request.title}
-          </h1>
+          </h2>
 
           {/* Context Metadata */}
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground font-mono pt-1">

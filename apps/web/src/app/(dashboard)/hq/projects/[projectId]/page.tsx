@@ -81,8 +81,7 @@ export default async function HQProjectDetailPage({
     <OrbitShell
       profile={profile}
       basePath="/hq"
-      title={project.name}
-      description="Project engagement workspace."
+      hideHeader={true}
     >
       <div className="space-y-8">
         {/* Project Workspace Header with Metrics and Tabs */}

@@ -30,6 +30,8 @@ export const createTeamMemberSchema = z.object({
     .min(1, "Work email is required")
     .email("Please enter a valid work email address"),
   job_role: employeeJobRoleEnum,
+  department: z.string().trim().max(100, "Department name is too long").optional().nullable(),
+  is_project_manager: z.boolean().optional().default(false),
   status: employeeStatusEnum.default("ACTIVE"),
   phone: z
     .string()
@@ -53,6 +55,8 @@ export const updateTeamMemberSchema = z.object({
     .optional()
     .nullable(),
   job_role: employeeJobRoleEnum,
+  department: z.string().trim().max(100, "Department name is too long").optional().nullable(),
+  is_project_manager: z.boolean().optional().default(false),
   status: employeeStatusEnum,
   phone: z
     .string()

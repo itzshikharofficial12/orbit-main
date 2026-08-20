@@ -10,16 +10,13 @@ import {
   CheckCircle2,
   AlertCircle,
   RotateCcw,
-  UserMinus,
 } from "lucide-react";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { GivePortalAccessDialog } from "./give-portal-access-dialog";
-import {
-  sendClientPasswordResetAction,
-  unlinkClientUserAction,
-} from "../actions";
+import { RemovePortalAccessDialog } from "./remove-portal-access-dialog";
+import { sendClientPasswordResetAction } from "../actions";
 import type { Client } from "../types";
 import type { Profile } from "@/lib/supabase/types";
 
@@ -45,23 +42,6 @@ export function PortalAccessCard({ client, portalUsers }: PortalAccessCardProps)
       setFeedback({ type: "success", message: result.message || "Password reset email sent." });
     } else {
       setFeedback({ type: "error", message: result.error || "Failed to send reset email." });
-    }
-  }
-
-  async function handleUnlinkAccess(profileId: string) {
-    if (!window.confirm("Are you sure you want to remove portal access for this client user?")) {
-      return;
-    }
-    setActionLoading("unlink");
-    setFeedback(null);
-    const result = await unlinkClientUserAction(profileId, client.id);
-    setActionLoading(null);
-
-    if (result.success) {
-      setFeedback({ type: "success", message: "Portal access removed." });
-      router.refresh();
-    } else {
-      setFeedback({ type: "error", message: result.error || "Failed to remove portal access." });
     }
   }
 
@@ -168,16 +148,13 @@ export function PortalAccessCard({ client, portalUsers }: PortalAccessCardProps)
                   <span>{actionLoading === "reset" ? "Sending..." : "Send Password Reset"}</span>
                 </Button>
 
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={actionLoading === "unlink"}
-                  onClick={() => handleUnlinkAccess(primaryUser.id)}
-                  className="h-8 text-xs gap-1.5 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                >
-                  <UserMinus className="h-3 w-3" />
-                  <span>{actionLoading === "unlink" ? "Removing..." : "Remove Access"}</span>
-                </Button>
+                <RemovePortalAccessDialog
+                  clientId={client.id}
+                  clientName={client.name}
+                  profileId={primaryUser.id}
+                  userEmail={primaryUser.email}
+                  userName={`${primaryUser.first_name} ${primaryUser.last_name || ""}`.trim()}
+                />
               </div>
             </div>
           </div>

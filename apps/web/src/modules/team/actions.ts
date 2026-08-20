@@ -24,11 +24,18 @@ export async function createTeamMemberAction(
     return { success: false, error: "Unauthorized: Super Admin access required." };
   }
 
+  const rawJobRole = (formData.get("job_role") as EmployeeJobRole) || "OTHER";
+  const rawIsPm = formData.has("is_project_manager")
+    ? formData.get("is_project_manager") === "true"
+    : rawJobRole === "PROJECT_MANAGER";
+
   const rawData = {
     first_name: formData.get("first_name") as string,
     last_name: (formData.get("last_name") as string) || null,
     email: formData.get("email") as string,
-    job_role: formData.get("job_role") as EmployeeJobRole,
+    job_role: rawJobRole,
+    department: (formData.get("department") as string) || null,
+    is_project_manager: rawIsPm,
     status: (formData.get("status") as EmployeeStatus) || "ACTIVE",
     phone: (formData.get("phone") as string) || null,
   };
@@ -74,6 +81,8 @@ export async function createTeamMemberAction(
           last_name: validation.data.last_name?.trim() || null,
           role: "EMPLOYEE",
           job_role: validation.data.job_role,
+          department: validation.data.department || null,
+          is_project_manager: validation.data.is_project_manager,
           status: validation.data.status,
           phone: validation.data.phone?.trim() || null,
         },
@@ -93,6 +102,9 @@ export async function createTeamMemberAction(
       first_name: validation.data.first_name.trim(),
       last_name: validation.data.last_name?.trim() || null,
       role: "EMPLOYEE",
+      job_role: validation.data.job_role,
+      status: validation.data.status,
+      phone: validation.data.phone?.trim() || null,
       updated_at: new Date().toISOString(),
     } as never);
 
@@ -108,6 +120,8 @@ export async function createTeamMemberAction(
         last_name: validation.data.last_name?.trim() || null,
         role: "EMPLOYEE",
         job_role: validation.data.job_role,
+        department: validation.data.department || null,
+        is_project_manager: validation.data.is_project_manager,
         status: validation.data.status,
         phone: validation.data.phone?.trim() || null,
         avatar_url: null,
@@ -132,11 +146,18 @@ export async function updateTeamMemberAction(
     return { success: false, error: "Unauthorized: Super Admin access required." };
   }
 
+  const rawJobRole = (formData.get("job_role") as EmployeeJobRole) || "OTHER";
+  const rawIsPm = formData.has("is_project_manager")
+    ? formData.get("is_project_manager") === "true"
+    : undefined;
+
   const rawData = {
     id: formData.get("id") as string,
     first_name: formData.get("first_name") as string,
     last_name: (formData.get("last_name") as string) || null,
-    job_role: formData.get("job_role") as EmployeeJobRole,
+    job_role: rawJobRole,
+    department: (formData.get("department") as string) || null,
+    is_project_manager: rawIsPm,
     status: formData.get("status") as EmployeeStatus,
     phone: (formData.get("phone") as string) || null,
   };
@@ -158,12 +179,18 @@ export async function updateTeamMemberAction(
       return { success: false, error: "Supabase service credentials not configured." };
     }
 
-    // 1. Update user metadata
+    // 1. Update user metadata in Supabase Auth
+    const { data: userData } = await adminClient.auth.admin.getUserById(validation.data.id);
+    const existingMeta = userData?.user?.user_metadata || {};
+
     await adminClient.auth.admin.updateUserById(validation.data.id, {
       user_metadata: {
+        ...existingMeta,
         first_name: validation.data.first_name.trim(),
         last_name: validation.data.last_name?.trim() || null,
         job_role: validation.data.job_role,
+        department: validation.data.department !== undefined ? validation.data.department : existingMeta.department,
+        is_project_manager: validation.data.is_project_manager,
         status: validation.data.status,
         phone: validation.data.phone?.trim() || null,
       },
@@ -175,6 +202,9 @@ export async function updateTeamMemberAction(
       .update({
         first_name: validation.data.first_name.trim(),
         last_name: validation.data.last_name?.trim() || null,
+        job_role: validation.data.job_role,
+        status: validation.data.status,
+        phone: validation.data.phone?.trim() || null,
         updated_at: new Date().toISOString(),
       } as never)
       .eq("id", validation.data.id);
@@ -219,7 +249,7 @@ export async function assignClientProjectManagerAction(
     // 1. Get current client
     const { data: rawClient, error: fetchErr } = await supabase
       .from("clients")
-      .select("id, name, notes")
+      .select("id, name, notes, project_manager_id")
       .eq("id", clientId)
       .single();
 
@@ -227,7 +257,7 @@ export async function assignClientProjectManagerAction(
       return { success: false, error: "Client not found." };
     }
 
-    const client = rawClient as { id: string; name: string; notes: string | null };
+    const client = rawClient as { id: string; name: string; notes: string | null; project_manager_id: string | null };
     const previousPmId = extractClientPmId(client);
     const cleanNotes = extractCleanNotes(client.notes);
 
@@ -239,8 +269,9 @@ export async function assignClientProjectManagerAction(
         : `[PM: ${projectManagerId}]`;
     }
 
-    // 2. Update client record
+    // 2. Update client record with BOTH project_manager_id and notes fallback
     const updatePayload: Record<string, any> = {
+      project_manager_id: projectManagerId || null,
       notes: updatedNotes,
       updated_at: new Date().toISOString(),
     };

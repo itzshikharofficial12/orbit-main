@@ -23,6 +23,8 @@ export function AddTeamMemberDialog() {
     last_name: "",
     email: "",
     job_role: "PROJECT_MANAGER" as EmployeeJobRole,
+    department: "",
+    is_project_manager: true,
     status: "ACTIVE" as EmployeeStatus,
     phone: "",
   });
@@ -33,6 +35,8 @@ export function AddTeamMemberDialog() {
       last_name: "",
       email: "",
       job_role: "PROJECT_MANAGER",
+      department: "",
+      is_project_manager: true,
       status: "ACTIVE",
       phone: "",
     });
@@ -74,6 +78,8 @@ export function AddTeamMemberDialog() {
     if (formData.last_name) payload.append("last_name", formData.last_name);
     payload.append("email", formData.email);
     payload.append("job_role", formData.job_role);
+    if (formData.department) payload.append("department", formData.department);
+    payload.append("is_project_manager", String(formData.is_project_manager));
     payload.append("status", formData.status);
     if (formData.phone) payload.append("phone", formData.phone);
 
@@ -212,33 +218,53 @@ export function AddTeamMemberDialog() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="job_role" className="text-xs font-medium">
-                    Job Role *
+                    Job Function / Role *
                   </Label>
                   <select
                     id="job_role"
                     value={formData.job_role}
-                    onChange={(e) =>
+                    onChange={(e) => {
+                      const newRole = e.target.value as EmployeeJobRole;
                       setFormData((prev) => ({
                         ...prev,
-                        job_role: e.target.value as EmployeeJobRole,
-                      }))
-                    }
+                        job_role: newRole,
+                        is_project_manager: newRole === "PROJECT_MANAGER" ? true : prev.is_project_manager,
+                      }));
+                    }}
                     disabled={isLoading}
                     className="w-full h-8 px-2.5 text-xs rounded-md border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                   >
                     <option value="PROJECT_MANAGER">Project Manager</option>
                     <option value="DEVELOPER">Developer</option>
                     <option value="DESIGNER">Designer</option>
-                    <option value="CONTENT">Content</option>
+                    <option value="CONTENT">Content Specialist</option>
                     <option value="MARKETING">Marketing</option>
                     <option value="SALES">Sales</option>
-                    <option value="OTHER">Other</option>
+                    <option value="OTHER">Executive / General</option>
                   </select>
                   {fieldErrors.job_role && (
                     <p className="text-[11px] text-destructive">{fieldErrors.job_role}</p>
                   )}
                 </div>
 
+                <div className="space-y-1.5">
+                  <Label htmlFor="department" className="text-xs font-medium">
+                    Department (Optional)
+                  </Label>
+                  <Input
+                    id="department"
+                    value={formData.department}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, department: e.target.value }))
+                    }
+                    placeholder="e.g. Admin, Content, Engineering"
+                    className="h-8 text-xs"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label htmlFor="status" className="text-xs font-medium">
                     Status *
@@ -259,22 +285,47 @@ export function AddTeamMemberDialog() {
                     <option value="INACTIVE">Inactive</option>
                   </select>
                 </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone" className="text-xs font-medium">
+                    Phone Number (Optional)
+                  </Label>
+                  <Input
+                    id="phone"
+                    value={formData.phone}
+                    onChange={(e) =>
+                      setFormData((prev) => ({ ...prev, phone: e.target.value }))
+                    }
+                    placeholder="e.g. +91 98765 43210"
+                    className="h-8 text-xs font-mono"
+                    disabled={isLoading}
+                  />
+                </div>
               </div>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="phone" className="text-xs font-medium">
-                  Phone Number (Optional)
-                </Label>
-                <Input
-                  id="phone"
-                  value={formData.phone}
+              {/* PM Eligibility Checkbox */}
+              <div className="rounded-xl border border-border/70 bg-secondary/30 p-3 flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="is_project_manager"
+                  checked={formData.is_project_manager}
                   onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, phone: e.target.value }))
+                    setFormData((prev) => ({
+                      ...prev,
+                      is_project_manager: e.target.checked,
+                    }))
                   }
-                  placeholder="e.g. +91 98765 43210"
-                  className="h-8 text-xs font-mono"
                   disabled={isLoading}
+                  className="mt-0.5 h-4 w-4 rounded border-border text-primary focus:ring-ring cursor-pointer"
                 />
+                <div className="space-y-0.5 cursor-pointer" onClick={() => setFormData((prev) => ({ ...prev, is_project_manager: !prev.is_project_manager }))}>
+                  <Label htmlFor="is_project_manager" className="text-xs font-semibold text-foreground cursor-pointer">
+                    Eligible for Client Project Manager Assignment
+                  </Label>
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    When enabled, this team member will be available in the PM assignment dropdown across client workspaces regardless of their primary job function.
+                  </p>
+                </div>
               </div>
 
               {/* Actions */}

@@ -51,8 +51,7 @@ export default async function ClientDetailPage({ params }: ClientDetailPageProps
     <OrbitShell
       profile={profile}
       basePath="/hq"
-      title={client.name}
-      description="Client engagement workspace."
+      hideHeader={true}
     >
       <div className="space-y-8">
         <ClientDetailHeader client={client} projectManagers={projectManagers} />

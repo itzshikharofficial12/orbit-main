@@ -61,20 +61,11 @@ export function ClientRequestsView({
 
   return (
     <div className="space-y-8 max-w-5xl">
-      {/* 1. Header Toolbar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-bold tracking-tight text-foreground">
-            Support & Requests
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Ask a question, report an issue, or request an update from Celestia Studios.
-          </p>
-        </div>
-
+      {/* 1. Action Bar */}
+      <div className="flex items-center justify-end">
         <Button
           onClick={() => setIsNewModalOpen(true)}
-          className="h-9 px-4 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shrink-0"
+          className="h-9 px-4 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shrink-0 cursor-pointer"
         >
           <Plus className="h-4 w-4" />
           <span>New Request</span>

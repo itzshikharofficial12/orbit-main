@@ -3,10 +3,11 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutGrid, Users, FolderKanban, Inbox, Video, CreditCard, Bell, LogOut, Menu, X, UserCheck } from "lucide-react";
+import { LayoutGrid, Users, FolderKanban, Inbox, Video, CreditCard, Bell, LogOut, Menu, X, UserCheck, Settings } from "lucide-react";
 import type { Profile } from "@/lib/supabase/types";
 import { Badge } from "@/components/ui/badge";
 import { OrbitBrand } from "@/components/brand/orbit-brand";
+import { OrbitAvatar } from "@/components/ui/orbit-avatar";
 import { signOutAction } from "@/modules/auth/actions";
 import { cn } from "@/lib/utils";
 
@@ -179,32 +180,47 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
         </div>
 
         {/* Bottom: Profile & Sign Out */}
-        <div className="p-4 border-t border-border/50 bg-sidebar/90">
-          <div className="flex flex-col space-y-3.5">
-            <div className="flex flex-col space-y-1">
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm font-medium text-foreground truncate">
+        <div className="p-3 border-t border-border/50 bg-sidebar/90 space-y-2">
+          <Link
+            href={`${basePath}/settings`}
+            onClick={() => setIsMobileOpen(false)}
+            className={cn(
+              "flex items-center gap-3 p-2 rounded-lg transition-colors group cursor-pointer border",
+              pathname.startsWith(`${basePath}/settings`)
+                ? "bg-sidebar-accent border-border/60 text-sidebar-accent-foreground shadow-xs"
+                : "border-transparent hover:bg-sidebar-accent/50 hover:border-border/40"
+            )}
+          >
+            <OrbitAvatar
+              src={profile?.avatar_url}
+              name={displayName}
+              size="md"
+              className="ring-1 ring-border/80"
+            />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-1.5">
+                <span className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
                   {displayName}
                 </span>
-                <Badge variant="role">
+                <Badge variant="role" className="text-[10px] px-1 py-0 scale-90 origin-right">
                   {profile?.role === "SUPER_ADMIN" ? "HQ" : profile?.role === "EMPLOYEE" ? "Team" : "Client"}
                 </Badge>
               </div>
-              <span className="text-xs text-muted-foreground truncate">
+              <span className="text-[11px] text-muted-foreground truncate block">
                 {profile?.email}
               </span>
             </div>
+          </Link>
 
-            <form action={signOutAction}>
-              <button
-                type="submit"
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium text-muted-foreground hover:text-foreground rounded-md border border-border/40 hover:bg-sidebar-accent transition-colors cursor-pointer"
-              >
-                <LogOut className="h-3.5 w-3.5" />
-                <span>Sign out</span>
-              </button>
-            </form>
-          </div>
+          <form action={signOutAction}>
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center gap-2 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground rounded-md border border-border/30 hover:bg-sidebar-accent/60 transition-colors cursor-pointer"
+            >
+              <LogOut className="h-3.5 w-3.5" />
+              <span>Sign out</span>
+            </button>
+          </form>
         </div>
       </aside>
     </>
