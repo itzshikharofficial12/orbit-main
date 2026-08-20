@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   CreditCard,
   Calendar,
@@ -43,6 +44,8 @@ export function ClientPaymentsView({
   payments,
   metrics,
 }: ClientPaymentsViewProps) {
+  const router = useRouter();
+
   // Modal states
   const [payingTarget, setPayingTarget] = React.useState<CompletePaymentTarget | null>(null);
   const [inspectingPlan, setInspectingPlan] = React.useState<BillingPlanWithRelations | null>(null);
@@ -665,6 +668,7 @@ export function ClientPaymentsView({
           item={payingTarget}
           isOpen={!!payingTarget}
           onClose={() => setPayingTarget(null)}
+          onSuccess={() => router.refresh()}
         />
       )}
 

@@ -20,7 +20,13 @@ interface RazorpayCheckoutButtonProps {
   size?: "sm" | "default" | "lg";
   variant?: "default" | "outline" | "secondary";
   className?: string;
-  onSuccess?: () => void;
+  onSuccess?: (details: {
+    paymentId: string;
+    orderId: string;
+    paymentRecordId?: string;
+    isDuplicate?: boolean;
+  }) => void;
+  onError?: (error: string) => void;
 }
 
 export function RazorpayCheckoutButton({
@@ -32,9 +38,11 @@ export function RazorpayCheckoutButton({
   variant = "default",
   className = "",
   onSuccess,
+  onError,
 }: RazorpayCheckoutButtonProps) {
   const [loading, setLoading] = React.useState(false);
   const [success, setSuccess] = React.useState(false);
+  const [errorMsg, setErrorMsg] = React.useState<string | null>(null);
   const router = useRouter();
 
   // Helper to dynamically load the Razorpay checkout script
@@ -60,10 +68,13 @@ export function RazorpayCheckoutButton({
   const handleCheckout = async () => {
     try {
       setLoading(true);
+      setErrorMsg(null);
 
       const scriptLoaded = await loadRazorpayScript();
       if (!scriptLoaded) {
-        alert("Failed to load Razorpay checkout SDK. Please check your internet connection.");
+        const err = "Failed to load Razorpay checkout SDK. Please check your internet connection.";
+        setErrorMsg(err);
+        if (onError) onError(err);
         setLoading(false);
         return;
       }
@@ -72,7 +83,9 @@ export function RazorpayCheckoutButton({
       const res = await createRazorpayOrderAction({ scheduleItemId });
 
       if (!res.success || !res.orderId || !res.keyId) {
-        alert(res.error || "Unable to initialize checkout. Please try again or use Bank Transfer.");
+        const err = res.error || "Unable to initialize checkout. Please try again or use Bank Transfer.";
+        setErrorMsg(err);
+        if (onError) onError(err);
         setLoading(false);
         return;
       }
@@ -117,15 +130,24 @@ export function RazorpayCheckoutButton({
               setLoading(false);
               router.refresh();
               if (onSuccess) {
-                onSuccess();
+                onSuccess({
+                  paymentId: response.razorpay_payment_id,
+                  orderId: response.razorpay_order_id,
+                  paymentRecordId: verifyRes.paymentRecordId,
+                  isDuplicate: verifyRes.isDuplicate,
+                });
               }
             } else {
-              alert(verifyRes.error || "Signature verification failed. Please contact support.");
+              const err = verifyRes.error || "Signature verification failed. Please contact support.";
+              setErrorMsg(err);
+              if (onError) onError(err);
               setLoading(false);
             }
           } catch (err: unknown) {
             console.error("Error during payment verification:", err);
-            alert("Payment verification encountered an unexpected error.");
+            const msg = "Payment verification encountered an unexpected error.";
+            setErrorMsg(msg);
+            if (onError) onError(msg);
             setLoading(false);
           }
         },
@@ -135,7 +157,9 @@ export function RazorpayCheckoutButton({
       paymentObject.open();
     } catch (err: unknown) {
       console.error("Error in handleCheckout:", err);
-      alert("Failed to initiate online payment.");
+      const msg = "Failed to initiate online payment.";
+      setErrorMsg(msg);
+      if (onError) onError(msg);
       setLoading(false);
     }
   };

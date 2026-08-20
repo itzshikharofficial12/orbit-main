@@ -307,7 +307,15 @@ export async function reconcileRazorpayPayment(params: ReconcilePaymentParams): 
       let { data: insertedPayment, error: insertErr } = await supabase
         .from("payments")
         .insert(insertPayload as never)
-        .select("id")
+        .select(`
+          id,
+          receipt_number,
+          amount,
+          currency,
+          paid_at,
+          transaction_reference,
+          status
+        `)
         .single();
 
       if (insertErr && insertErr.message?.includes("razorpay_signature")) {
@@ -315,7 +323,15 @@ export async function reconcileRazorpayPayment(params: ReconcilePaymentParams): 
         const retry = await supabase
           .from("payments")
           .insert(insertPayload as never)
-          .select("id")
+          .select(`
+            id,
+            receipt_number,
+            amount,
+            currency,
+            paid_at,
+            transaction_reference,
+            status
+          `)
           .single();
         insertedPayment = retry.data;
         insertErr = retry.error;
@@ -333,8 +349,34 @@ export async function reconcileRazorpayPayment(params: ReconcilePaymentParams): 
 
     await supabase
       .from("billing_schedule_items")
-      .update({ status: newStatus } as never)
+      .update({
+        status: newStatus,
+        updated_at: new Date().toISOString(),
+      } as never)
       .eq("id", item.id);
+
+    // Check if all schedule items in the plan are settled (PAID or WAIVED)
+    if (item.billing_plan_id) {
+      const { data: allPlanItems } = await supabase
+        .from("billing_schedule_items")
+        .select("id, status")
+        .eq("billing_plan_id", item.billing_plan_id);
+
+      if (allPlanItems && allPlanItems.length > 0) {
+        const allSettled = allPlanItems.every(
+          (it) => it.id === item.id ? (newStatus === "PAID" || newStatus === "WAIVED") : (it.status === "PAID" || it.status === "WAIVED")
+        );
+        if (allSettled) {
+          await supabase
+            .from("billing_plans")
+            .update({
+              status: "COMPLETED",
+              updated_at: new Date().toISOString(),
+            } as never)
+            .eq("id", item.billing_plan_id);
+        }
+      }
+    }
 
     // 5. Trigger In-App Notifications
     const formattedAmount = formatCurrency(actualAmount, item.currency || "INR");
@@ -343,7 +385,7 @@ export async function reconcileRazorpayPayment(params: ReconcilePaymentParams): 
       clientId: item.client_id,
       type: "PAYMENT_CONFIRMED",
       title: "Payment Received",
-      message: `Your payment of ${formattedAmount} for "${item.title}" has been successfully processed.`,
+      message: `Your payment of ${formattedAmount} for "${item.title}" has been successfully processed via Razorpay.`,
       link: `/client/payments/${item.id}`,
     });
 
@@ -360,6 +402,9 @@ export async function reconcileRazorpayPayment(params: ReconcilePaymentParams): 
       revalidatePath("/client/payments");
       revalidatePath(`/hq/payments/${item.id}`);
       revalidatePath(`/client/payments/${item.id}`);
+      revalidatePath(`/hq/clients/${item.client_id}`);
+      revalidatePath("/client");
+      revalidatePath("/hq");
     } catch {
       // Safe outside Next request lifecycle (e.g. test scripts or direct webhooks)
     }
@@ -384,7 +429,12 @@ export async function verifyRazorpayPaymentAction(params: {
   paymentId: string;
   signature: string;
   scheduleItemId: string;
-}): Promise<{ success: boolean; error?: string }> {
+}): Promise<{
+  success: boolean;
+  paymentRecordId?: string;
+  isDuplicate?: boolean;
+  error?: string;
+}> {
   try {
     const profile = await getAuthenticatedProfile();
     if (!profile) {
@@ -415,7 +465,11 @@ export async function verifyRazorpayPaymentAction(params: {
       return { success: false, error: result.error };
     }
 
-    return { success: true };
+    return {
+      success: true,
+      paymentRecordId: result.paymentRecordId,
+      isDuplicate: result.isDuplicate,
+    };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Failed to verify Razorpay payment.";
     console.error("Error in verifyRazorpayPaymentAction:", err);

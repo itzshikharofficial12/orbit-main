@@ -58,6 +58,7 @@ export async function POST(request: Request) {
 
     // 3. Process Webhook Event Types
     switch (eventType) {
+      case "order.paid":
       case "payment.captured": {
         const paymentEntity = payload.payload?.payment?.entity;
         if (!paymentEntity) {
