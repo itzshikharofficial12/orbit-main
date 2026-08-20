@@ -1,8 +1,7 @@
 {
   "/(dashboard)/hq/page": "app/(dashboard)/hq/page.js",
   "/(dashboard)/client/payments/page": "app/(dashboard)/client/payments/page.js",
-  "/(dashboard)/hq/settings/page": "app/(dashboard)/hq/settings/page.js",
   "/(dashboard)/hq/payments/page": "app/(dashboard)/hq/payments/page.js",
-  "/(dashboard)/client/payments/[invoiceId]/page": "app/(dashboard)/client/payments/[invoiceId]/page.js",
-  "/(dashboard)/hq/projects/page": "app/(dashboard)/hq/projects/page.js"
+  "/(dashboard)/hq/projects/page": "app/(dashboard)/hq/projects/page.js",
+  "/(dashboard)/hq/settings/page": "app/(dashboard)/hq/settings/page.js"
 }
