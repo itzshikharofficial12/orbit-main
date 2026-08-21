@@ -84,6 +84,14 @@ export const env = {
  * Otherwise falls back to NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_VERCEL_URL.
  */
 export async function getCanonicalAppUrl(): Promise<string> {
+  // 1. Explicit configured environment variables
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL;
+
+  // 2. In server actions / request context, inspect incoming headers
   try {
     const { headers } = await import("next/headers");
     const headerList = await headers();
@@ -91,23 +99,27 @@ export async function getCanonicalAppUrl(): Promise<string> {
     const proto =
       headerList.get("x-forwarded-proto") ||
       (host?.includes("localhost") || host?.includes("127.0.0.1") ? "http" : "https");
-    if (host) {
+    if (host && !host.includes("localhost") && !host.includes("127.0.0.1")) {
       return `${proto}://${host}`.replace(/\/$/, "");
     }
   } catch {
     // headers() throws if called outside a request context
   }
 
+  if (configuredUrl && !configuredUrl.includes("placeholder")) {
+    return configuredUrl.replace(/\/$/, "");
+  }
+
   if (typeof window !== "undefined" && window.location?.origin) {
     return window.location.origin.replace(/\/$/, "");
   }
 
-  if (process.env.NEXT_PUBLIC_SITE_URL) {
-    return process.env.NEXT_PUBLIC_SITE_URL.replace(/\/$/, "");
-  }
-
   if (process.env.NEXT_PUBLIC_VERCEL_URL) {
     return `https://${process.env.NEXT_PUBLIC_VERCEL_URL}`.replace(/\/$/, "");
+  }
+
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`.replace(/\/$/, "");
   }
 
   return "http://localhost:3001";

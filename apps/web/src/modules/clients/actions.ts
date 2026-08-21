@@ -330,6 +330,14 @@ export async function inviteClientUserAction(
       const baseUrl = await getCanonicalAppUrl();
       const confirmationUrl = `${baseUrl}/auth/confirm?next=/set-password`;
 
+      // Safe temporary debug log (No tokens, secrets or passwords logged)
+      console.log("[INVITE DEBUG]", {
+        canonicalAppUrl: baseUrl,
+        redirectTo: confirmationUrl,
+        environment: process.env.NODE_ENV,
+        siteUrlEnv: process.env.NEXT_PUBLIC_SITE_URL || process.env.SITE_URL || "unset",
+      });
+
       const { error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(
         normalizedEmail,
         {

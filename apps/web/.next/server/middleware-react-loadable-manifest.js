@@ -1,1 +1,0 @@
-self.__REACT_LOADABLE_MANIFEST="{\"lib/env.ts -> next/headers\":{\"id\":\"lib/env.ts -> next/headers\",\"files\":[\"static/chunks/_app-pages-browser_node_modules_pnpm_next_15_5_23_react-dom_19_2_8_react_19_2_8__react_19_2_8-c8f986.js\"]}}"
