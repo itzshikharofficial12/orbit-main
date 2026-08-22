@@ -19,6 +19,7 @@ import {
   Copy,
   Check,
   Receipt,
+  Clock,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,8 @@ export interface CompletePaymentTarget {
   currency: string;
   dueDate?: string | null;
   projectName?: string;
+  isUnderVerification?: boolean;
+  initialTab?: "ONLINE" | "BANK_TRANSFER";
 }
 
 interface CompletePaymentModalProps {
@@ -69,11 +72,13 @@ export function CompletePaymentModal({
   const [paymentSuccess, setPaymentSuccess] = React.useState<VerifiedPaymentSuccess | null>(null);
   const [copiedTxn, setCopiedTxn] = React.useState(false);
 
+  const [isPendingVerificationLocked, setIsPendingVerificationLocked] = React.useState(false);
+
   const router = useRouter();
 
   React.useEffect(() => {
     if (isOpen && item) {
-      setActiveTab("ONLINE");
+      setActiveTab(item.initialTab || "ONLINE");
       setTransferAmount(item.amount.toString());
       setTransactionReference("");
       setPaidAt(new Date().toISOString().split("T")[0]);
@@ -81,6 +86,7 @@ export function CompletePaymentModal({
       setErrorMsg(null);
       setPaymentSuccess(null);
       setCopiedTxn(false);
+      setIsPendingVerificationLocked(Boolean(item.isUnderVerification));
     }
   }, [isOpen, item]);
 
@@ -96,6 +102,11 @@ export function CompletePaymentModal({
 
   const handleBankTransferSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (item.isUnderVerification || isPendingVerificationLocked) {
+      setIsPendingVerificationLocked(true);
+      return;
+    }
 
     if (!transactionReference.trim()) {
       setErrorMsg("Please enter the Bank Reference Number / UTR.");
@@ -129,18 +140,45 @@ export function CompletePaymentModal({
         router.refresh();
         if (onSuccess) onSuccess();
       } else {
-        setErrorMsg(res.error || "Failed to submit bank transfer.");
         setIsSubmitting(false);
+        const code = res.code;
+        const err = String(res.error || "");
+
+        if (
+          code === "PAYMENT_VERIFICATION_PENDING" ||
+          err.includes("verification") ||
+          err.includes("uq_payments_active_pending_verification") ||
+          err.includes("duplicate") ||
+          err.includes("already exists") ||
+          err.includes("23505")
+        ) {
+          setIsPendingVerificationLocked(true);
+          router.refresh();
+          return;
+        }
+
+        setErrorMsg(res.error || "Failed to submit bank transfer.");
       }
     } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Submission error";
-      setErrorMsg(msg);
+      const msg = err instanceof Error ? err.message : String(err || "");
+      if (
+        msg.includes("verification") ||
+        msg.includes("uq_payments_active_pending_verification") ||
+        msg.includes("duplicate") ||
+        msg.includes("already exists") ||
+        msg.includes("23505")
+      ) {
+        setIsPendingVerificationLocked(true);
+        router.refresh();
+      } else {
+        setErrorMsg(msg || "Submission error");
+      }
       setIsSubmitting(false);
     }
   };
 
   const handleModalClose = () => {
-    if (paymentSuccess) {
+    if (paymentSuccess || isPendingVerificationLocked) {
       router.refresh();
       if (onSuccess) onSuccess();
     }
@@ -148,7 +186,7 @@ export function CompletePaymentModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4">
       {/* Backdrop */}
       <div
         className="fixed inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
@@ -159,10 +197,48 @@ export function CompletePaymentModal({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl border border-border/80 bg-card p-6 sm:p-7 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-150 space-y-5"
+        className="relative w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[90vh] overflow-y-auto rounded-2xl border border-border/80 bg-card p-4 sm:p-7 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-150 space-y-4 sm:space-y-5"
       >
-        {/* VIEW 1: PAYMENT SUCCESS CONFIRMATION SCREEN */}
-        {paymentSuccess ? (
+        {/* VIEW 0: UNDER VERIFICATION LOCKED SCREEN */}
+        {item.isUnderVerification || isPendingVerificationLocked ? (
+          <div className="space-y-4 sm:space-y-5 py-4 text-center">
+            <div className="h-12 w-12 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-400 flex items-center justify-center mx-auto shadow-sm">
+              <Clock className="h-6 w-6" />
+            </div>
+            <div className="space-y-2">
+              <div className="flex justify-center">
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-mono uppercase tracking-wider text-amber-400 font-bold px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  <span>Verification Pending</span>
+                </span>
+              </div>
+              <h3 className="text-lg font-bold text-foreground pt-1">
+                Verification Pending
+              </h3>
+              <div className="space-y-1 text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
+                <p className="font-medium text-foreground/90">Your bank transfer has already been submitted.</p>
+                <p>Our team is currently verifying your payment.</p>
+                <p className="text-[11px] text-muted-foreground/80 pt-1">
+                  You cannot submit another payment until verification is complete.
+                </p>
+              </div>
+            </div>
+            <div className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  router.refresh();
+                  onClose();
+                }}
+                className="w-full text-xs h-10 sm:h-9 cursor-pointer min-h-[44px] sm:min-h-0"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        ) : paymentSuccess ? (
+          /* VIEW 1: PAYMENT SUCCESS CONFIRMATION SCREEN */
           <div className="space-y-6 py-2">
             <div className="text-center space-y-3">
               <div className="h-14 w-14 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 flex items-center justify-center mx-auto shadow-lg shadow-emerald-950/30 animate-in zoom-in-90 duration-200">
@@ -443,11 +519,11 @@ export function CompletePaymentModal({
                       value={transactionReference}
                       onChange={(e) => setTransactionReference(e.target.value)}
                       placeholder="e.g., HDFC00012345678 or UPI Ref"
-                      className="font-mono text-xs h-8"
+                      className="font-mono text-sm sm:text-xs h-10 sm:h-8"
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="font-medium text-foreground">Transfer Amount</label>
                       <Input
@@ -457,7 +533,7 @@ export function CompletePaymentModal({
                         value={transferAmount}
                         onChange={(e) => setTransferAmount(e.target.value)}
                         placeholder="Amount"
-                        className="font-mono text-xs h-8"
+                        className="font-mono text-sm sm:text-xs h-10 sm:h-8"
                       />
                     </div>
 
@@ -467,7 +543,7 @@ export function CompletePaymentModal({
                         type="date"
                         value={paidAt}
                         onChange={(e) => setPaidAt(e.target.value)}
-                        className="font-mono text-xs h-8"
+                        className="font-mono text-sm sm:text-xs h-10 sm:h-8"
                       />
                     </div>
                   </div>
@@ -478,18 +554,18 @@ export function CompletePaymentModal({
                       placeholder="e.g., Transferred from Axis Bank account ending in 4092"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
-                      className="h-14 text-xs bg-background resize-none"
+                      className="h-16 sm:h-14 text-sm sm:text-xs bg-background resize-none"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-border/60">
+                <div className="flex items-center justify-between pt-2 border-t border-border/60 gap-2">
                   <Button
                     type="button"
                     variant="ghost"
                     size="sm"
                     onClick={onClose}
-                    className="text-xs h-8 cursor-pointer"
+                    className="text-xs h-10 sm:h-8 cursor-pointer min-h-[44px] sm:min-h-0"
                   >
                     Cancel
                   </Button>
@@ -497,7 +573,7 @@ export function CompletePaymentModal({
                     type="submit"
                     size="sm"
                     disabled={isSubmitting || !transactionReference.trim()}
-                    className="text-xs h-8 gap-1.5 cursor-pointer"
+                    className="text-xs h-10 sm:h-8 gap-1.5 cursor-pointer font-semibold min-h-[44px] sm:min-h-0"
                   >
                     {isSubmitting ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />

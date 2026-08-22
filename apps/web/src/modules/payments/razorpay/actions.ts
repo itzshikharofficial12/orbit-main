@@ -100,6 +100,17 @@ export async function createRazorpayOrderAction(params: {
       return { success: false, error: "This invoice is already settled or not payable." };
     }
 
+    // Block payment if an active bank transfer is under verification
+    const hasPendingVerification = (item.payments || []).some(
+      (p: any) => p.status === "PENDING_VERIFICATION" || p.status === "PENDING"
+    );
+    if (hasPendingVerification) {
+      return {
+        success: false,
+        error: "Your previous payment is currently under verification.",
+      };
+    }
+
     // Determine charge amount
     let chargeAmount = balanceDue;
     if (customAmount && customAmount > 0 && customAmount <= balanceDue) {

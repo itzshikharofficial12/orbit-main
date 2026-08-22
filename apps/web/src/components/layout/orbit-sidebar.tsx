@@ -108,32 +108,38 @@ export function OrbitSidebar({ profile, basePath }: OrbitSidebarProps) {
 
   return (
     <>
-      {/* Mobile Menu Toggle Button */}
-      <div className="lg:hidden fixed top-4 left-4 z-50">
-        <button
-          type="button"
-          onClick={() => setIsMobileOpen(!isMobileOpen)}
-          className="p-2 rounded-md border border-border bg-sidebar text-sidebar-foreground shadow-md hover:bg-sidebar-accent"
-          aria-label="Toggle navigation menu"
-        >
-          {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
-      </div>
+      {/* Mobile Menu Toggle Button (HQ Only, Client uses dedicated top & bottom nav) */}
+      {basePath === "/hq" && (
+        <div className="lg:hidden fixed top-4 left-4 z-50">
+          <button
+            type="button"
+            onClick={() => setIsMobileOpen(!isMobileOpen)}
+            className="p-2 rounded-md border border-border bg-sidebar text-sidebar-foreground shadow-md hover:bg-sidebar-accent"
+            aria-label="Toggle navigation menu"
+          >
+            {isMobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
+      )}
 
-      {/* Mobile Backdrop */}
-      {isMobileOpen && (
+      {/* Mobile Backdrop (HQ Only) */}
+      {basePath === "/hq" && isMobileOpen && (
         <div
           className="lg:hidden fixed inset-0 z-40 bg-black/70 backdrop-blur-sm transition-opacity"
           onClick={() => setIsMobileOpen(false)}
         />
       )}
 
-      {/* Sidebar Container */}
+      {/* Sidebar Container: Desktop only for client (md:flex), fixed drawer for HQ mobile (lg:static) */}
       <aside
         className={cn(
           "w-64 flex-shrink-0 flex flex-col justify-between border-r border-border/70 bg-sidebar text-sidebar-foreground z-40 transition-transform duration-200 ease-in-out",
-          "fixed lg:static inset-y-0 left-0",
-          isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+          basePath === "/client"
+            ? "hidden md:flex"
+            : cn(
+                "fixed lg:static inset-y-0 left-0",
+                isMobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+              )
         )}
       >
         {/* Top: Brand Header & Navigation */}

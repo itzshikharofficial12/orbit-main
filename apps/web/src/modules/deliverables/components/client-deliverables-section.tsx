@@ -168,22 +168,22 @@ export function ClientDeliverablesSection({
                       Review the file above before approving.
                     </div>
 
-                    <div className="flex items-center gap-2.5 self-end sm:self-auto">
+                    <div className="grid grid-cols-2 sm:flex items-center gap-2.5 w-full sm:w-auto">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => setRequestingDeliverable(item)}
-                        className="h-8 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary border-border/70 cursor-pointer"
+                        className="w-full sm:w-auto h-9 sm:h-8 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-secondary border-border/70 cursor-pointer min-h-[44px] sm:min-h-0"
                       >
                         Request Changes
                       </Button>
                       <Button
                         size="sm"
                         onClick={() => setApprovingDeliverable(item)}
-                        className="h-8 text-xs font-medium gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
+                        className="w-full sm:w-auto h-9 sm:h-8 text-xs font-medium gap-1.5 bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer min-h-[44px] sm:min-h-0 font-semibold"
                       >
                         <CheckCircle2 className="h-3.5 w-3.5" />
-                        <span>Approve Deliverable</span>
+                        <span>Approve</span>
                       </Button>
                     </div>
                   </div>

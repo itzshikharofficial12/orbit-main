@@ -65,7 +65,7 @@ export function ClientRequestsView({
       <div className="flex items-center justify-end">
         <Button
           onClick={() => setIsNewModalOpen(true)}
-          className="h-9 px-4 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shrink-0 cursor-pointer"
+          className="w-full sm:w-auto h-10 sm:h-9 px-4 text-xs font-semibold gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm shrink-0 cursor-pointer min-h-[44px] sm:min-h-0"
         >
           <Plus className="h-4 w-4" />
           <span>New Request</span>
@@ -117,8 +117,8 @@ export function ClientRequestsView({
 
       {/* 3. Filter Tabs */}
       <div className="space-y-4">
-        <div className="border-b border-border/60">
-          <nav className="flex space-x-2" aria-label="Request Categories">
+        <div className="border-b border-border/60 overflow-x-auto pb-px">
+          <nav className="flex space-x-2 min-w-max" aria-label="Request Categories">
             <button
               type="button"
               onClick={() => setActiveTab("ALL")}

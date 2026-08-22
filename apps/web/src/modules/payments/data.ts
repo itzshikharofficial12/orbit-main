@@ -74,16 +74,32 @@ export async function getBillingPlansForAdmin(
       query = query.eq("status", filters.status);
     }
 
-    const { data, error } = await query;
+    const [plansRes, paymentsRes] = await Promise.all([
+      query,
+      supabase
+        .from("payments")
+        .select("*")
+        .order("created_at", { ascending: false }),
+    ]);
 
-    if (error) {
-      if (!isMissingTable(error)) {
-        console.warn("Notice: Error fetching billing plans:", error.message || error);
+    if (plansRes.error) {
+      if (!isMissingTable(plansRes.error)) {
+        console.warn("Notice: Error fetching billing plans:", plansRes.error.message || plansRes.error);
       }
       return [];
     }
 
-    const rows = (data as unknown as BillingPlanWithRelations[]) || [];
+    const directPayments = (paymentsRes.data as Payment[]) || [];
+    const directPaymentsByScheduleItemId = new Map<string, Payment[]>();
+    for (const p of directPayments) {
+      if (p.billing_schedule_item_id) {
+        const list = directPaymentsByScheduleItemId.get(p.billing_schedule_item_id) || [];
+        list.push(p);
+        directPaymentsByScheduleItemId.set(p.billing_schedule_item_id, list);
+      }
+    }
+
+    const rows = (plansRes.data as unknown as BillingPlanWithRelations[]) || [];
 
     // Compute financial aggregates for each plan
     const enriched = rows.map((plan) => {
@@ -93,12 +109,47 @@ export async function getBillingPlansForAdmin(
 
       const scheduleItems = (plan.schedule_items || [])
         .map((item) => {
-          const itemPayments = (item.payments || []).filter((p) => p.status === "PAID");
+          const embedded = Array.isArray(item.payments) ? item.payments : [];
+          const direct = directPaymentsByScheduleItemId.get(item.id) || [];
+          const paymentMap = new Map<string, Payment>();
+          for (const p of [...embedded, ...direct]) {
+            if (p && p.id) {
+              paymentMap.set(p.id, p as Payment);
+            }
+          }
+          const allItemPayments = Array.from(paymentMap.values());
+
+          const itemPayments = allItemPayments.filter((p) => {
+            const st = (p.status || "").toUpperCase();
+            return st === "PAID" || st === "VERIFIED";
+          });
           const itemPaid = itemPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
           totalPlanPaid += itemPaid;
 
           const currentStatus = calculateScheduleStatus(item, itemPaid);
           const remaining = Math.max(0, Number(item.amount) - itemPaid);
+
+          // Find pending verification and rejected payments for this item
+          const pendingPayment = allItemPayments.find((p) => {
+            const st = (p.status || "").toUpperCase();
+            return (
+              st === "PENDING_VERIFICATION" ||
+              st === "PENDING" ||
+              st === "UNDER_VERIFICATION" ||
+              st === "VERIFICATION_PENDING" ||
+              st === "SUBMITTED"
+            );
+          });
+
+          const rejectedPayments = allItemPayments.filter((p) => {
+            const st = (p.status || "").toUpperCase();
+            return st === "FAILED" || st === "REJECTED";
+          });
+          const latestRejectedPayment = rejectedPayments.sort(
+            (a, b) =>
+              new Date(b.created_at || b.submitted_at || 0).getTime() -
+              new Date(a.created_at || a.submitted_at || 0).getTime()
+          )[0] || null;
 
           // Find earliest unpaid due date
           if (remaining > 0 && item.due_date) {
@@ -110,9 +161,13 @@ export async function getBillingPlansForAdmin(
 
           return {
             ...item,
+            payments: allItemPayments,
             status: currentStatus,
             paid_amount: itemPaid,
             remaining_amount: remaining,
+            is_under_verification: !!pendingPayment,
+            pending_verification_payment: pendingPayment || null,
+            latest_rejected_payment: latestRejectedPayment || null,
           };
         })
         .sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0));
@@ -157,28 +212,45 @@ export async function getBillingPlansForClient(
   try {
     const supabase = await getPaymentReadClient();
 
-    const { data, error } = await supabase
-      .from("billing_plans")
-      .select(`
-        *,
-        project:projects(id, name, status, service_type),
-        schedule_items:billing_schedule_items(
+    const [plansRes, paymentsRes] = await Promise.all([
+      supabase
+        .from("billing_plans")
+        .select(`
           *,
-          milestone:milestones(id, name, status),
-          payments(*)
-        )
-      `)
-      .eq("client_id", clientId)
-      .order("created_at", { ascending: false });
+          project:projects(id, name, status, service_type),
+          schedule_items:billing_schedule_items(
+            *,
+            milestone:milestones(id, name, status),
+            payments(*)
+          )
+        `)
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("payments")
+        .select("*")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false }),
+    ]);
 
-    if (error) {
-      if (!isMissingTable(error)) {
-        console.warn("Notice: Error fetching client billing plans:", error.message || error);
+    if (plansRes.error) {
+      if (!isMissingTable(plansRes.error)) {
+        console.warn("Notice: Error fetching client billing plans:", plansRes.error.message || plansRes.error);
       }
       return [];
     }
 
-    const rows = (data as unknown as BillingPlanWithRelations[]) || [];
+    const directPayments = (paymentsRes.data as Payment[]) || [];
+    const directPaymentsByScheduleItemId = new Map<string, Payment[]>();
+    for (const p of directPayments) {
+      if (p.billing_schedule_item_id) {
+        const list = directPaymentsByScheduleItemId.get(p.billing_schedule_item_id) || [];
+        list.push(p);
+        directPaymentsByScheduleItemId.set(p.billing_schedule_item_id, list);
+      }
+    }
+
+    const rows = (plansRes.data as unknown as BillingPlanWithRelations[]) || [];
 
     return rows.map((plan) => {
       let totalPlanPaid = 0;
@@ -187,12 +259,46 @@ export async function getBillingPlansForClient(
 
       const scheduleItems = (plan.schedule_items || [])
         .map((item) => {
-          const itemPayments = (item.payments || []).filter((p) => p.status === "PAID");
+          const embedded = Array.isArray(item.payments) ? item.payments : [];
+          const direct = directPaymentsByScheduleItemId.get(item.id) || [];
+          const paymentMap = new Map<string, Payment>();
+          for (const p of [...embedded, ...direct]) {
+            if (p && p.id) {
+              paymentMap.set(p.id, p as Payment);
+            }
+          }
+          const allItemPayments = Array.from(paymentMap.values());
+
+          const itemPayments = allItemPayments.filter((p) => {
+            const st = (p.status || "").toUpperCase();
+            return st === "PAID" || st === "VERIFIED";
+          });
           const itemPaid = itemPayments.reduce((acc, p) => acc + (Number(p.amount) || 0), 0);
           totalPlanPaid += itemPaid;
 
           const currentStatus = calculateScheduleStatus(item, itemPaid);
           const remaining = Math.max(0, Number(item.amount) - itemPaid);
+
+          const pendingPayment = allItemPayments.find((p) => {
+            const st = (p.status || "").toUpperCase();
+            return (
+              st === "PENDING_VERIFICATION" ||
+              st === "PENDING" ||
+              st === "UNDER_VERIFICATION" ||
+              st === "VERIFICATION_PENDING" ||
+              st === "SUBMITTED"
+            );
+          });
+
+          const rejectedPayments = allItemPayments.filter((p) => {
+            const st = (p.status || "").toUpperCase();
+            return st === "FAILED" || st === "REJECTED";
+          });
+          const latestRejectedPayment = rejectedPayments.sort(
+            (a, b) =>
+              new Date(b.created_at || b.submitted_at || 0).getTime() -
+              new Date(a.created_at || a.submitted_at || 0).getTime()
+          )[0] || null;
 
           if (remaining > 0 && item.due_date) {
             if (!nextDueDate || new Date(item.due_date) < new Date(nextDueDate)) {
@@ -203,9 +309,13 @@ export async function getBillingPlansForClient(
 
           return {
             ...item,
+            payments: allItemPayments,
             status: currentStatus,
             paid_amount: itemPaid,
             remaining_amount: remaining,
+            is_under_verification: !!pendingPayment,
+            pending_verification_payment: pendingPayment || null,
+            latest_rejected_payment: latestRejectedPayment || null,
           };
         })
         .sort((a, b) => (a.sequence_number || 0) - (b.sequence_number || 0));
@@ -347,7 +457,7 @@ export async function getPaymentsForClient(
         schedule_item:billing_schedule_items(id, title, amount, currency, due_date, billing_plan_id)
       `)
       .eq("client_id", clientId)
-      .order("paid_at", { ascending: false });
+      .order("created_at", { ascending: false });
 
     if (error) {
       if (!isMissingTable(error)) {
@@ -376,6 +486,7 @@ export async function getPaymentOverviewMetrics(
     dueThisMonth: 0,
     upcoming: 0,
     pendingVerificationCount: 0,
+    underVerificationAmount: 0,
     currency: "INR",
   };
 
@@ -458,17 +569,22 @@ export async function getPaymentOverviewMetrics(
       }
     }
 
-    // 3. Count pending verification bank transfers
+    // 3. Count pending verification bank transfers & calculate underVerificationAmount
     let pendingPaymentsQuery = supabase
       .from("payments")
-      .select("id", { count: "exact", head: true })
-      .eq("status", "PENDING")
+      .select("id, amount")
+      .in("status", ["PENDING", "PENDING_VERIFICATION"])
       .eq("method", "BANK_TRANSFER");
 
     if (clientId) {
       pendingPaymentsQuery = pendingPaymentsQuery.eq("client_id", clientId);
     }
-    const { count: pendingCount } = await pendingPaymentsQuery;
+    const { data: pendingPaymentsData } = await pendingPaymentsQuery;
+    const pendingCount = pendingPaymentsData?.length || 0;
+    const underVerificationAmount = (pendingPaymentsData || []).reduce(
+      (acc, p) => acc + (Number(p.amount) || 0),
+      0
+    );
 
     return {
       totalContractValue: totalContractValue > 0 ? totalContractValue : (totalCollected + totalOutstanding),
@@ -477,7 +593,8 @@ export async function getPaymentOverviewMetrics(
       overdue: totalOverdue,
       dueThisMonth: totalDueThisMonth,
       upcoming: totalUpcoming,
-      pendingVerificationCount: pendingCount || 0,
+      pendingVerificationCount: pendingCount,
+      underVerificationAmount,
       currency: "INR",
     };
   } catch (err) {
@@ -487,7 +604,7 @@ export async function getPaymentOverviewMetrics(
 }
 
 /**
- * Fetches all bank transfers awaiting admin verification (status = PENDING)
+ * Fetches all bank transfers awaiting admin verification (status IN ('PENDING', 'PENDING_VERIFICATION'))
  */
 export async function getPendingBankTransfers(): Promise<import("./types").PendingBankTransfer[]> {
   if (!env.isConfigured()) return [];
@@ -498,20 +615,13 @@ export async function getPendingBankTransfers(): Promise<import("./types").Pendi
     const { data, error } = await supabase
       .from("payments")
       .select(`
-        id,
-        amount,
-        currency,
-        transaction_reference,
-        paid_at,
-        created_at,
-        notes,
-        status,
+        *,
         client:clients(id, name, primary_contact_name, primary_contact_email, primary_contact_phone),
         project:projects(id, name),
-        schedule_item:billing_schedule_items(id, title, amount, due_date, billing_plan_id)
+        schedule_item:billing_schedule_items(id, title, amount, due_date, invoice_number, billing_plan_id)
       `)
       .eq("method", "BANK_TRANSFER")
-      .eq("status", "PENDING")
+      .in("status", ["PENDING", "PENDING_VERIFICATION"])
       .order("created_at", { ascending: false });
 
     if (error || !data) {
@@ -564,6 +674,14 @@ export async function getOverdueScheduleItems(): Promise<import("./types").Overd
       const paidAmount = paidPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
       const remainingAmount = Math.max(0, Number(item.amount) - paidAmount);
 
+      const pendingPayment = (item.payments || []).find(
+        (p: any) => p.status === "PENDING_VERIFICATION" || p.status === "PENDING"
+      );
+      const rejectedPayments = (item.payments || []).filter((p: any) => p.status === "FAILED");
+      const latestRejectedPayment = rejectedPayments.sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0] || null;
+
       if (remainingAmount > 0 && item.status !== "PAID" && item.status !== "WAIVED" && item.status !== "CANCELLED") {
         const dueDate = new Date(item.due_date);
         dueDate.setHours(0, 0, 0, 0);
@@ -580,6 +698,9 @@ export async function getOverdueScheduleItems(): Promise<import("./types").Overd
           remainingAmount,
           paidAmount,
           status: item.status,
+          is_under_verification: !!pendingPayment,
+          pending_verification_payment: pendingPayment || null,
+          latest_rejected_payment: latestRejectedPayment || null,
           client: item.client || { id: "", name: "Client" },
           project: item.project || null,
           billing_plan: item.billing_plan || { id: "", name: "Plan", billing_type: "ONE_TIME" },
@@ -619,7 +740,7 @@ export async function getUpcomingScheduleItems(
         client:clients(id, name),
         project:projects(id, name),
         billing_plan:billing_plans(id, name),
-        payments(id, amount, status)
+        payments(id, amount, status, created_at)
       `)
       .gte("due_date", today.toISOString().split("T")[0])
       .order("due_date", { ascending: true })
@@ -636,6 +757,14 @@ export async function getUpcomingScheduleItems(
       const paidAmount = paidPayments.reduce((acc: number, p: any) => acc + (Number(p.amount) || 0), 0);
       const remainingAmount = Math.max(0, Number(item.amount) - paidAmount);
 
+      const pendingPayment = (item.payments || []).find(
+        (p: any) => p.status === "PENDING_VERIFICATION" || p.status === "PENDING"
+      );
+      const rejectedPayments = (item.payments || []).filter((p: any) => p.status === "FAILED");
+      const latestRejectedPayment = rejectedPayments.sort(
+        (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0] || null;
+
       if (remainingAmount > 0 && item.status !== "PAID" && item.status !== "WAIVED" && item.status !== "CANCELLED") {
         upcomingList.push({
           id: item.id,
@@ -646,6 +775,9 @@ export async function getUpcomingScheduleItems(
           remainingAmount,
           paidAmount,
           status: item.status,
+          is_under_verification: !!pendingPayment,
+          pending_verification_payment: pendingPayment || null,
+          latest_rejected_payment: latestRejectedPayment || null,
           client: item.client || { id: "", name: "Client" },
           project: item.project || null,
           billing_plan: item.billing_plan || { id: "", name: "Plan" },
@@ -697,11 +829,22 @@ export async function getBillingPlanById(
       const currentStatus = calculateScheduleStatus(item, itemPaid);
       const remaining = Math.max(0, Number(item.amount) - itemPaid);
 
+      const pendingPayment = (item.payments || []).find(
+        (p) => p.status === "PENDING_VERIFICATION" || p.status === "PENDING"
+      );
+      const rejectedPayments = (item.payments || []).filter((p) => p.status === "FAILED");
+      const latestRejectedPayment = rejectedPayments.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      )[0] || null;
+
       return {
         ...item,
         status: currentStatus,
         paid_amount: itemPaid,
         remaining_amount: remaining,
+        is_under_verification: !!pendingPayment,
+        pending_verification_payment: pendingPayment || null,
+        latest_rejected_payment: latestRejectedPayment || null,
       };
     });
 
@@ -760,6 +903,14 @@ export async function getInvoiceById(
     const balanceDue = Math.max(0, Number(item.amount) - totalPaid);
     const currentStatus = calculateScheduleStatus(item, totalPaid);
 
+    const pendingPayment = (item.payments || []).find(
+      (p: any) => p.status === "PENDING_VERIFICATION" || p.status === "PENDING"
+    );
+    const rejectedPayments = (item.payments || []).filter((p: any) => p.status === "FAILED");
+    const latestRejectedPayment = rejectedPayments.sort(
+      (a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    )[0] || null;
+
     return {
       id: item.id,
       invoice_number: item.invoice_number || `CS-2026-${item.id.slice(0, 4)}`,
@@ -779,6 +930,9 @@ export async function getInvoiceById(
       terms: item.terms || null,
       paid_amount: totalPaid,
       balance_due: balanceDue,
+      is_under_verification: !!pendingPayment,
+      pending_verification_payment: pendingPayment || null,
+      latest_rejected_payment: latestRejectedPayment || null,
       client: item.client || {
         id: item.client_id,
         name: "Client",

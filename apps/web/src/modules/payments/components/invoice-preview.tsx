@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Download,
   ArrowLeft,
@@ -14,6 +15,8 @@ import {
   AlertCircle,
   HelpCircle,
   ArrowDownRight,
+  RotateCcw,
+  XCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { BillingStatusBadge } from "./billing-status-badge";
@@ -21,6 +24,7 @@ import { CompletePaymentModal } from "./complete-payment-modal";
 import { PaymentQueryModal } from "./payment-query-modal";
 import { formatCurrency, formatPaymentDate } from "../utils";
 import { CELESTIA_COMPANY_INFO } from "../config";
+import { createBrowserClient } from "@/lib/supabase/client";
 import type { InvoiceWithDetails } from "../types";
 
 interface InvoicePreviewProps {
@@ -34,10 +38,42 @@ export function InvoicePreview({
   isSuperAdmin,
   onRecordPayment,
 }: InvoicePreviewProps) {
+  const router = useRouter();
   const [showPaymentModal, setShowPaymentModal] = React.useState(false);
   const [showQueryModal, setShowQueryModal] = React.useState(false);
   const backHref = isSuperAdmin ? "/hq/payments" : "/client/payments";
   const pdfDownloadUrl = `/api/payments/invoices/${invoice.id}/pdf`;
+
+  // Realtime subscription to reload when verified/rejected
+  React.useEffect(() => {
+    try {
+      const supabase = createBrowserClient();
+      const channel = supabase
+        .channel(`invoice-realtime-${invoice.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "payments",
+            filter: `billing_schedule_item_id=eq.${invoice.id}`,
+          },
+          () => {
+            router.refresh();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch {
+      // Fallback
+    }
+  }, [invoice.id, router]);
+
+  const isUnderVerification = !!invoice.is_under_verification;
+  const latestRejected = invoice.latest_rejected_payment;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -54,19 +90,40 @@ export function InvoicePreview({
         <div className="flex items-center gap-2">
           {!isSuperAdmin && invoice.balance_due > 0 && (
             <>
-              <Button
-                size="sm"
-                onClick={() => setShowPaymentModal(true)}
-                className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold"
-              >
-                <CreditCard className="h-3.5 w-3.5" />
-                <span>Pay Now</span>
-              </Button>
+              {isUnderVerification ? (
+                <Button
+                  size="sm"
+                  disabled
+                  className="h-8 text-xs gap-1.5 bg-secondary/60 text-muted-foreground border border-border/80 cursor-not-allowed opacity-50 select-none pointer-events-none"
+                >
+                  <Clock className="h-3.5 w-3.5 text-amber-400" />
+                  <span>Verification Pending</span>
+                </Button>
+              ) : latestRejected ? (
+                <Button
+                  size="sm"
+                  onClick={() => setShowPaymentModal(true)}
+                  className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold cursor-pointer shadow-sm"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                  <span>Pay Again</span>
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={() => setShowPaymentModal(true)}
+                  className="h-8 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 font-semibold cursor-pointer"
+                >
+                  <CreditCard className="h-3.5 w-3.5" />
+                  <span>Pay Now</span>
+                </Button>
+              )}
+
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowQueryModal(true)}
-                className="h-8 gap-1.5 text-xs border-border/80 hover:bg-secondary"
+                className="h-8 gap-1.5 text-xs border-border/80 hover:bg-secondary cursor-pointer"
               >
                 <HelpCircle className="h-3.5 w-3.5 text-amber-400" />
                 <span>Raise a Query</span>
@@ -79,7 +136,7 @@ export function InvoicePreview({
               variant="outline"
               size="sm"
               onClick={onRecordPayment}
-              className="h-8 gap-1.5 text-xs hover:text-emerald-400 hover:border-emerald-800/60"
+              className="h-8 gap-1.5 text-xs hover:text-emerald-400 hover:border-emerald-800/60 cursor-pointer"
             >
               <ArrowDownRight className="h-3.5 w-3.5 text-emerald-400" />
               <span>Record Payment</span>
@@ -94,6 +151,50 @@ export function InvoicePreview({
           </a>
         </div>
       </div>
+
+      {/* Verification Notice Banner */}
+      {isUnderVerification && (
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/25 text-xs text-amber-300 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-amber-400 shrink-0" />
+            <div>
+              <span className="font-semibold font-mono">Payment Under Verification</span>
+              <span className="text-amber-200/70 ml-2 hidden sm:inline">
+                • Your bank transfer is awaiting verification from Celestia Studios. (UTR:{" "}
+                <strong className="font-mono">{invoice.pending_verification_payment?.transaction_reference || "N/A"}</strong>)
+              </span>
+            </div>
+          </div>
+          {invoice.pending_verification_payment && (
+            <span className="font-mono text-[11px] text-amber-400 shrink-0">
+              Submitted {formatPaymentDate(invoice.pending_verification_payment.submitted_at || invoice.pending_verification_payment.created_at)}
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* Rejection Notice Banner */}
+      {latestRejected && !isUnderVerification && invoice.balance_due > 0 && (
+        <div className="p-3.5 rounded-xl bg-destructive/10 border border-destructive/25 text-xs text-destructive flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <XCircle className="h-4 w-4 shrink-0" />
+            <div>
+              <span className="font-semibold">Payment verification failed:</span>
+              <span className="text-destructive/90 ml-1.5">
+                &ldquo;{latestRejected.rejection_reason || "Bank reference could not be verified."}&rdquo;
+              </span>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setShowPaymentModal(true)}
+            className="h-7 text-xs border-destructive/30 text-destructive hover:bg-destructive/15 shrink-0 cursor-pointer"
+          >
+            Submit Again
+          </Button>
+        </div>
+      )}
 
       {/* Web Invoice Printable Paper Layout */}
       <div className="rounded-xl border border-border/80 bg-card p-6 sm:p-10 shadow-lg space-y-8">
@@ -121,7 +222,11 @@ export function InvoicePreview({
               <p>Due Date: {formatPaymentDate(invoice.due_date)}</p>
             </div>
             <div className="pt-1">
-              <BillingStatusBadge status={invoice.status} />
+              {isUnderVerification ? (
+                <BillingStatusBadge status="UNDER_VERIFICATION" />
+              ) : (
+                <BillingStatusBadge status={invoice.status} />
+              )}
             </div>
           </div>
         </div>
@@ -240,10 +345,12 @@ export function InvoicePreview({
               className={`flex items-center justify-between p-3 rounded-md text-sm font-bold ${
                 invoice.balance_due === 0
                   ? "bg-emerald-950/40 text-emerald-300 border border-emerald-800/50"
-                  : "bg-amber-950/40 text-amber-300 border border-amber-800/50"
+                  : isUnderVerification
+                  ? "bg-amber-950/40 text-amber-300 border border-amber-800/50"
+                  : "bg-secondary text-foreground border border-border/80"
               }`}
             >
-              <span>Balance Due:</span>
+              <span>{isUnderVerification ? "Balance (Under Review):" : "Balance Due:"}</span>
               <span>{formatCurrency(invoice.balance_due, invoice.currency)}</span>
             </div>
           </div>
@@ -262,54 +369,85 @@ export function InvoicePreview({
           )}
         </div>
 
-        {/* 6. Payment Receipts Ledger (If payments have been made) */}
+        {/* 6. Payment Receipts & Submissions Ledger */}
         {invoice.payments.length > 0 && (
           <div className="space-y-3 pt-6 border-t border-border/40">
             <div className="flex items-center justify-between">
               <span className="font-mono text-xs uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
                 <Receipt className="h-3.5 w-3.5 text-emerald-400" />
-                <span>Verified Payment Receipts ({invoice.payments.length})</span>
+                <span>Payments & Submissions Ledger ({invoice.payments.length})</span>
               </span>
             </div>
 
             <div className="rounded-lg border border-border/60 overflow-hidden divide-y divide-border/40">
-              {invoice.payments.map((p) => (
-                <div
-                  key={p.id}
-                  className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-secondary/10 hover:bg-secondary/20 transition-colors text-xs font-mono"
-                >
-                  <div className="space-y-0.5">
-                    <span className="font-semibold text-foreground">
-                      Receipt {p.receipt_number || `CS-RCP-2026-${p.id.slice(0, 4)}`}
-                    </span>
-                    <p className="text-[11px] text-muted-foreground">
-                      Date: {formatPaymentDate(p.paid_at)} • Ref (UTR): {p.transaction_reference || "—"}
-                    </p>
-                  </div>
+              {invoice.payments.map((p) => {
+                const isPaid = p.status === "PAID";
+                const isPending = p.status === "PENDING_VERIFICATION" || p.status === "PENDING";
+                const isRejected = p.status === "FAILED";
 
-                  <div className="flex items-center gap-3">
-                    <span className="font-bold text-emerald-400">
-                      {formatCurrency(p.amount, p.currency)}
-                    </span>
-                    {p.status === "PAID" ? (
-                      <a
-                        href={`/api/payments/receipts/${p.id}/pdf`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                return (
+                  <div
+                    key={p.id}
+                    className="p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 bg-secondary/10 hover:bg-secondary/20 transition-colors text-xs font-mono"
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-foreground">
+                          {isPaid
+                            ? `Receipt ${p.receipt_number || `CS-RCP-2026-${p.id.slice(0, 4)}`}`
+                            : `Bank Transfer Proof`}
+                        </span>
+                        <BillingStatusBadge status={p.status} />
+                      </div>
+                      <p className="text-[11px] text-muted-foreground">
+                        {isPaid && `Verified: ${formatPaymentDate(p.verified_at || p.paid_at)}`}
+                        {isPending && `Submitted: ${formatPaymentDate(p.submitted_at || p.created_at)}`}
+                        {isRejected && `Submitted: ${formatPaymentDate(p.submitted_at || p.created_at)}`}
+                        {p.transaction_reference && ` • Ref (UTR): ${p.transaction_reference}`}
+                      </p>
+                      {isRejected && p.rejection_reason && (
+                        <p className="text-[11px] text-destructive italic">
+                          Reason: {p.rejection_reason}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={`font-bold ${
+                          isPaid
+                            ? "text-emerald-400"
+                            : isPending
+                            ? "text-amber-400"
+                            : "text-destructive"
+                        }`}
                       >
-                        <Button variant="outline" size="sm" className="h-7 text-xs gap-1 font-sans">
-                          <Download className="h-3 w-3" />
-                          <span>Download Receipt</span>
-                        </Button>
-                      </a>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground italic font-sans">
-                        Pending Verification
+                        {formatCurrency(p.amount, p.currency)}
                       </span>
-                    )}
+                      {isPaid ? (
+                        <a
+                          href={`/api/payments/receipts/${p.id}/pdf`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button variant="outline" size="sm" className="h-7 text-xs gap-1 font-sans">
+                            <Download className="h-3 w-3" />
+                            <span>Download Receipt</span>
+                          </Button>
+                        </a>
+                      ) : isPending ? (
+                        <span className="text-[11px] text-amber-400 font-sans italic">
+                          Awaiting Admin Verification
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-destructive font-sans italic">
+                          Rejected
+                        </span>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}
@@ -324,9 +462,11 @@ export function InvoicePreview({
             currency: invoice.currency,
             dueDate: invoice.due_date,
             projectName: invoice.project?.name,
+            initialTab: latestRejected ? "BANK_TRANSFER" : "ONLINE",
           }}
           isOpen={showPaymentModal}
           onClose={() => setShowPaymentModal(false)}
+          onSuccess={() => router.refresh()}
         />
       )}
 

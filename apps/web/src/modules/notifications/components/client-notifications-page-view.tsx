@@ -206,7 +206,7 @@ export function ClientNotificationsPageView() {
                     : "bg-card/60 hover:bg-card border-border/60 opacity-80 hover:opacity-100"
                 }`}
               >
-                <div className="flex items-start justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4">
                   <div className="flex items-start gap-3.5 min-w-0">
                     {/* Category Icon */}
                     <div
@@ -259,13 +259,13 @@ export function ClientNotificationsPageView() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex items-center gap-2 shrink-0 pt-0.5">
+                  <div className="flex items-center gap-2 shrink-0 pt-2 sm:pt-0.5 border-t sm:border-t-0 border-border/30 justify-end">
                     {item.link && (
                       <Button
                         size="sm"
                         variant={isUnread && priority !== "INFO" ? "default" : "secondary"}
                         onClick={(e) => handleActionClick(e, item)}
-                        className="h-8 text-xs px-3 gap-1.5 font-medium shadow-sm"
+                        className="h-8 text-xs px-3 gap-1.5 font-medium shadow-sm cursor-pointer"
                       >
                         <span>{actionLabel}</span>
                         <ArrowRight className="h-3 w-3" />
@@ -280,10 +280,10 @@ export function ClientNotificationsPageView() {
                           e.stopPropagation();
                           markAsRead(item.id);
                         }}
-                        className="h-8 text-xs px-2.5 text-muted-foreground hover:text-foreground"
-                        title="Mark as read"
+                        className="h-8 text-xs px-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
                       >
-                        <Check className="h-3.5 w-3.5" />
+                        <Check className="h-3 w-3 sm:mr-1" />
+                        <span className="hidden sm:inline">Mark read</span>
                       </Button>
                     )}
                   </div>

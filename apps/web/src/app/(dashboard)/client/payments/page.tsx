@@ -43,6 +43,7 @@ export default async function ClientPaymentsPage() {
           dueThisMonth: 0,
           upcoming: 0,
           pendingVerificationCount: 0,
+          underVerificationAmount: 0,
           currency: "INR",
         },
       ];

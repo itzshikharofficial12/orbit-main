@@ -42,6 +42,9 @@ export interface BillingScheduleItemWithRelations extends BillingScheduleItem {
   payments?: Payment[];
   paid_amount?: number;
   remaining_amount?: number;
+  pending_verification_payment?: Payment | null;
+  latest_rejected_payment?: Payment | null;
+  is_under_verification?: boolean;
 }
 
 export interface BillingPlanWithRelations extends BillingPlan {
@@ -79,6 +82,7 @@ export interface PaymentOverviewMetrics {
   dueThisMonth: number;
   upcoming: number;
   pendingVerificationCount: number;
+  underVerificationAmount: number;
   currency: string;
 }
 
@@ -92,6 +96,9 @@ export interface OverdueScheduleItem {
   remainingAmount: number;
   paidAmount: number;
   status: BillingScheduleStatus;
+  is_under_verification?: boolean;
+  pending_verification_payment?: Payment | null;
+  latest_rejected_payment?: Payment | null;
   client: {
     id: string;
     name: string;
@@ -118,6 +125,9 @@ export interface UpcomingScheduleItem {
   remainingAmount: number;
   paidAmount: number;
   status: BillingScheduleStatus;
+  is_under_verification?: boolean;
+  pending_verification_payment?: Payment | null;
+  latest_rejected_payment?: Payment | null;
   client: {
     id: string;
     name: string;
@@ -138,6 +148,9 @@ export interface PendingBankTransfer {
   currency: string;
   transaction_reference: string | null;
   paid_at: string | null;
+  submitted_at?: string | null;
+  rejected_at?: string | null;
+  rejection_reason?: string | null;
   created_at: string;
   notes: string | null;
   status: PaymentStatus;
@@ -175,6 +188,7 @@ export interface BillingPlanFilterParams {
 
 export interface PaymentActionResult {
   success: boolean;
+  code?: string;
   plan?: BillingPlan;
   payment?: Payment;
   error?: string;
@@ -223,6 +237,9 @@ export interface InvoiceWithDetails {
     status: string;
   } | null;
   payments: PaymentWithRelations[];
+  pending_verification_payment?: PaymentWithRelations | null;
+  latest_rejected_payment?: PaymentWithRelations | null;
+  is_under_verification?: boolean;
 }
 
 export interface ReceiptWithDetails {

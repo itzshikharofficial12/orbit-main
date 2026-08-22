@@ -731,19 +731,9 @@ export function AdminPaymentsDirectory({
                           {pay.client?.name || "Client"}
                         </span>
                         <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary text-muted-foreground">
-                          {pay.method}
+                          {pay.method === "BANK_TRANSFER" ? "Bank Wire" : pay.method}
                         </span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-mono ${
-                            pay.status === "PAID"
-                              ? "bg-emerald-950/40 text-emerald-400 border border-emerald-800/40"
-                              : pay.status === "PENDING"
-                              ? "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-                              : "bg-destructive/10 text-destructive border border-destructive/20"
-                          }`}
-                        >
-                          {pay.status}
-                        </span>
+                        <BillingStatusBadge status={pay.status} />
                       </div>
                       <div className="text-[11px] text-muted-foreground flex items-center gap-2">
                         {pay.schedule_item && <span>{pay.schedule_item.title}</span>}

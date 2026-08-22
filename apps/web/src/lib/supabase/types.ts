@@ -923,8 +923,11 @@ export interface Database {
           razorpay_payment_id: string | null;
           razorpay_signature: string | null;
           paid_at: string | null;
+          submitted_at: string | null;
           verified_at: string | null;
           verified_by: string | null;
+          rejected_at: string | null;
+          rejection_reason: string | null;
           notes: string | null;
           created_by: string;
           created_at: string;
@@ -945,8 +948,11 @@ export interface Database {
           razorpay_payment_id?: string | null;
           razorpay_signature?: string | null;
           paid_at?: string | null;
+          submitted_at?: string | null;
           verified_at?: string | null;
           verified_by?: string | null;
+          rejected_at?: string | null;
+          rejection_reason?: string | null;
           notes?: string | null;
           created_by: string;
           created_at?: string;
@@ -967,8 +973,11 @@ export interface Database {
           razorpay_payment_id?: string | null;
           razorpay_signature?: string | null;
           paid_at?: string | null;
+          submitted_at?: string | null;
           verified_at?: string | null;
           verified_by?: string | null;
+          rejected_at?: string | null;
+          rejection_reason?: string | null;
           notes?: string | null;
           created_by?: string;
           created_at?: string;

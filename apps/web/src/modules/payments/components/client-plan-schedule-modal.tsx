@@ -129,6 +129,8 @@ export function ClientPlanScheduleModal({
             {scheduleItems.map((item, idx) => {
               const remaining = item.remaining_amount !== undefined ? item.remaining_amount : item.amount;
               const isPaid = item.status === "PAID" || remaining <= 0;
+              const isUnderVerification = !!item.is_under_verification;
+              const latestRejected = item.latest_rejected_payment;
 
               return (
                 <div
@@ -141,7 +143,13 @@ export function ClientPlanScheduleModal({
                         #{idx + 1}
                       </span>
                       <span className="font-medium text-foreground">{item.title}</span>
-                      <BillingStatusBadge status={item.status} />
+                      {isUnderVerification ? (
+                        <BillingStatusBadge status="UNDER_VERIFICATION" />
+                      ) : latestRejected ? (
+                        <BillingStatusBadge status="FAILED" label="Verification failed" />
+                      ) : (
+                        <BillingStatusBadge status={item.status} />
+                      )}
                     </div>
 
                     <div className="text-[11px] text-muted-foreground flex items-center gap-2 font-mono">
@@ -158,6 +166,11 @@ export function ClientPlanScheduleModal({
                           </span>
                         </>
                       )}
+                      {isUnderVerification && (
+                        <span className="text-amber-400">
+                          • Awaiting verification
+                        </span>
+                      )}
                     </div>
                   </div>
 
@@ -167,31 +180,64 @@ export function ClientPlanScheduleModal({
                         {formatCurrency(item.amount, item.currency)}
                       </span>
                       {!isPaid && (
-                        <span className="text-[10px] text-amber-400 block">
-                          Due: {formatCurrency(remaining, item.currency)}
+                        <span className={`text-[10px] block ${isUnderVerification ? "text-amber-400" : "text-muted-foreground"}`}>
+                          {isUnderVerification ? "Under Review: " : "Due: "}
+                          {formatCurrency(remaining, item.currency)}
                         </span>
                       )}
                     </div>
 
                     <div className="flex items-center gap-1.5 font-sans">
                       {!isPaid && onPayItem && (
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            onClose();
-                            onPayItem({
-                              id: item.id,
-                              title: item.title,
-                              amount: remaining,
-                              currency: item.currency,
-                              dueDate: item.due_date,
-                              projectName: plan.project?.name,
-                            });
-                          }}
-                          className="h-7 text-xs px-2.5 bg-primary text-primary-foreground hover:bg-primary/90"
-                        >
-                          Pay
-                        </Button>
+                        <>
+                          {isUnderVerification ? (
+                            <Button
+                              size="sm"
+                              disabled
+                              className="h-7 text-xs px-2.5 bg-secondary/60 text-muted-foreground border border-border/80 cursor-not-allowed opacity-50 select-none pointer-events-none"
+                            >
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse mr-1" />
+                              <span>Verification Pending</span>
+                            </Button>
+                          ) : latestRejected ? (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                onClose();
+                                onPayItem({
+                                  id: item.id,
+                                  title: item.title,
+                                  amount: remaining,
+                                  currency: item.currency,
+                                  dueDate: item.due_date,
+                                  projectName: plan.project?.name,
+                                  initialTab: "BANK_TRANSFER",
+                                });
+                              }}
+                              className="h-7 text-xs px-2.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                            >
+                              Pay Again
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              onClick={() => {
+                                onClose();
+                                onPayItem({
+                                  id: item.id,
+                                  title: item.title,
+                                  amount: remaining,
+                                  currency: item.currency,
+                                  dueDate: item.due_date,
+                                  projectName: plan.project?.name,
+                                });
+                              }}
+                              className="h-7 text-xs px-2.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
+                            >
+                              Pay
+                            </Button>
+                          )}
+                        </>
                       )}
 
                       <Link

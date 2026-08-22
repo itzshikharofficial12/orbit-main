@@ -80,6 +80,9 @@ export default async function ClientPortalPage() {
             if (daysRemaining < 0) isOverdue = true;
           }
 
+          const isUnderVerification = !!item.is_under_verification;
+          const latestRejected = item.latest_rejected_payment;
+
           candidateItems.push({
             id: item.id,
             amount: remaining,
@@ -89,13 +92,17 @@ export default async function ClientPortalPage() {
             dueDate: item.due_date,
             isOverdue,
             daysRemaining,
+            isUnderVerification,
+            latestRejectionReason: latestRejected?.rejection_reason || null,
           });
         }
       }
     }
 
-    // Sort: overdue first, then by daysRemaining ascending
+    // Sort: items under verification first, then overdue, then by daysRemaining ascending
     candidateItems.sort((a, b) => {
+      if (a.isUnderVerification && !b.isUnderVerification) return -1;
+      if (!a.isUnderVerification && b.isUnderVerification) return 1;
       if (a.isOverdue && !b.isOverdue) return -1;
       if (!a.isOverdue && b.isOverdue) return 1;
       return a.daysRemaining - b.daysRemaining;

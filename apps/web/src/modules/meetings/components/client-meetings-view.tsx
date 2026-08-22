@@ -98,12 +98,12 @@ export function ClientMeetingsView({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between pt-3 border-t border-border/40 gap-2">
+                <div className="grid grid-cols-2 sm:flex items-center justify-between pt-3 border-t border-border/40 gap-2 w-full">
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => setSelectedMeeting(meeting)}
-                    className="text-xs h-8 px-2.5 text-muted-foreground hover:text-foreground cursor-pointer"
+                    className="w-full sm:w-auto text-xs h-9 sm:h-8 px-2.5 text-muted-foreground hover:text-foreground cursor-pointer min-h-[44px] sm:min-h-0"
                   >
                     View Details
                   </Button>
@@ -112,9 +112,9 @@ export function ClientMeetingsView({
                     href={meeting.meeting_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex"
+                    className="w-full sm:w-auto inline-flex"
                   >
-                    <Button size="sm" className="text-xs h-8 gap-1.5 cursor-pointer">
+                    <Button size="sm" className="w-full sm:w-auto text-xs h-9 sm:h-8 gap-1.5 cursor-pointer font-semibold min-h-[44px] sm:min-h-0">
                       <span>Join Meeting</span>
                       <ExternalLink className="h-3.5 w-3.5" />
                     </Button>

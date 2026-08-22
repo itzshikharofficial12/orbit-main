@@ -8,8 +8,13 @@ import { NotificationItem } from "./notification-item";
 import { NotificationSoundToggle } from "./notification-sound-toggle";
 import { Button } from "@/components/ui/button";
 import { parseNotificationDetails } from "../utils";
+import { cn } from "@/lib/utils";
 
-export function NotificationCenter() {
+interface NotificationCenterProps {
+  triggerClassName?: string;
+}
+
+export function NotificationCenter({ triggerClassName }: NotificationCenterProps = {}) {
   const [isOpen, setIsOpen] = React.useState<boolean>(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
@@ -90,7 +95,10 @@ export function NotificationCenter() {
         aria-expanded={isOpen}
         aria-haspopup="dialog"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
-        className="relative inline-flex items-center justify-center h-9 px-2.5 rounded-md border border-border/60 bg-background hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+        className={cn(
+          "relative inline-flex items-center justify-center h-9 px-2.5 rounded-md border border-border/60 bg-background hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer",
+          triggerClassName
+        )}
       >
         <Bell className="h-4 w-4" />
         {unreadCount > 0 && (

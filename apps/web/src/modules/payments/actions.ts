@@ -437,7 +437,7 @@ export async function verifyBankTransferAction(params: {
         status: "PAID",
         verified_at: new Date().toISOString(),
         verified_by: profile.id,
-        notes: notes || payment.notes || "Bank transfer verified by Admin.",
+        notes: notes ? `${notes} (Verified by Admin)` : payment.notes || "Bank transfer verified by Admin.",
       } as never)
       .eq("id", paymentId)
       .select()
@@ -509,8 +509,8 @@ export async function verifyBankTransferAction(params: {
     await notifyClientUsers({
       clientId: payment.client_id,
       type: "PAYMENT_CONFIRMED",
-      title: "Bank Transfer Verified",
-      message: `Your bank transfer payment of ${formattedAmount} (UTR: ${payment.transaction_reference || "N/A"}) has been verified and confirmed.`,
+      title: "Payment verified",
+      message: `Your ${formattedAmount} payment has been verified.`,
       link: payment.billing_schedule_item_id
         ? `/client/payments/${payment.billing_schedule_item_id}`
         : "/client/payments",
@@ -577,25 +577,50 @@ export async function rejectBankTransferAction(params: {
       `)
       .eq("id", paymentId)
       .maybeSingle();
-
     if (fetchErr || !existingPayment) {
       return { success: false, error: "Payment record not found." };
     }
 
     const payment = existingPayment as any;
 
+    const notesContent = payment.notes
+      ? `${payment.notes}\n[REJECTED]: ${reason.trim()}`
+      : `[REJECTED]: ${reason.trim()}`;
+
+    const baseUpdatePayload: Record<string, any> = {
+      status: "FAILED",
+      verified_at: new Date().toISOString(),
+      verified_by: profile.id,
+      notes: notesContent,
+    };
+
     // Update status to FAILED and record audit reason
-    const { data: updatedPayment, error: updateErr } = await supabase
+    let { data: updatedPayment, error: updateErr } = await supabase
       .from("payments")
       .update({
-        status: "FAILED",
-        verified_at: new Date().toISOString(),
-        verified_by: profile.id,
-        notes: `[REJECTED]: ${reason.trim()}`,
+        ...baseUpdatePayload,
+        rejected_at: new Date().toISOString(),
+        rejection_reason: reason.trim(),
       } as never)
       .eq("id", paymentId)
       .select()
       .single();
+
+    if (
+      updateErr &&
+      (updateErr.message?.includes("rejected_at") ||
+        updateErr.message?.includes("rejection_reason") ||
+        (updateErr as any).code === "PGRST204")
+    ) {
+      const retry = await supabase
+        .from("payments")
+        .update(baseUpdatePayload as never)
+        .eq("id", paymentId)
+        .select()
+        .single();
+      updatedPayment = retry.data;
+      updateErr = retry.error;
+    }
 
     if (updateErr || !updatedPayment) {
       return { success: false, error: updateErr?.message || "Failed to update payment status." };
@@ -606,8 +631,8 @@ export async function rejectBankTransferAction(params: {
     await notifyClientUsers({
       clientId: payment.client_id,
       type: "PAYMENT_FAILED",
-      title: "Bank Transfer Verification Rejected",
-      message: `Your bank transfer payment of ${formattedAmount} (UTR: ${payment.transaction_reference || "N/A"}) could not be verified: "${reason.trim()}". Please re-submit your transfer details.`,
+      title: "Payment verification failed",
+      message: `Your ${formattedAmount} payment could not be verified: "${reason.trim()}".`,
       link: payment.billing_schedule_item_id
         ? `/client/payments/${payment.billing_schedule_item_id}`
         : "/client/payments",
@@ -692,31 +717,88 @@ export async function submitBankTransferAction(
       return { success: false, error: "Forbidden: You do not have access to this invoice." };
     }
 
-    // 2. Insert PENDING payment record
+    // 2. Validate invoice is payable
+    if (item.status === "PAID" || item.status === "WAIVED" || item.status === "CANCELLED") {
+      return {
+        success: false,
+        error: "This invoice is already settled or not payable.",
+      };
+    }
+
+    // 3. Prevent duplicate submission: check if an active pending verification payment already exists
+    const { data: activePendingPayment } = await supabase
+      .from("payments")
+      .select("id, status")
+      .eq("billing_schedule_item_id", item.id)
+      .in(
+        "status",
+        ["PENDING", "PENDING_VERIFICATION", "UNDER_VERIFICATION", "VERIFICATION_PENDING", "SUBMITTED"] as any
+      )
+      .maybeSingle();
+
+    if (activePendingPayment) {
+      return {
+        success: false,
+        code: "PAYMENT_VERIFICATION_PENDING",
+        error: "This payment has already been submitted and is awaiting verification.",
+      };
+    }
+
+    // 4. Insert PENDING_VERIFICATION payment record with database-level uniqueness protection
+    const insertPayload: Record<string, any> = {
+      client_id: item.client_id,
+      project_id: item.project_id || null,
+      billing_schedule_item_id: item.id,
+      amount,
+      currency: item.currency || "INR",
+      method: "BANK_TRANSFER",
+      status: "PENDING_VERIFICATION",
+      transaction_reference: transactionReference,
+      paid_at: paidAt ? new Date(paidAt).toISOString() : new Date().toISOString(),
+      notes: notes || "Bank transfer submitted by client for verification.",
+      created_by: profile.id,
+    };
+
     const { data: newPayment, error: insertErr } = await supabase
       .from("payments")
-      .insert({
-        client_id: item.client_id,
-        project_id: item.project_id || null,
-        billing_schedule_item_id: item.id,
-        amount,
-        currency: item.currency || "INR",
-        method: "BANK_TRANSFER",
-        status: "PENDING",
-        transaction_reference: transactionReference,
-        paid_at: paidAt ? new Date(paidAt).toISOString() : new Date().toISOString(),
-        notes: notes || "Bank transfer submitted by client for verification.",
-        created_by: profile.id,
-      } as never)
+      .insert(insertPayload as never)
       .select()
       .single();
 
     if (insertErr || !newPayment) {
+      const errCode = (insertErr as any)?.code;
+      const errMsg = String(insertErr?.message || "");
+      const errDetails = String((insertErr as any)?.details || "");
+      const errHint = String((insertErr as any)?.hint || "");
+
+      if (
+        errCode === "23505" ||
+        errMsg.includes("duplicate key") ||
+        errMsg.includes("uq_payments_active_pending_verification") ||
+        errDetails.includes("uq_payments_active_pending_verification") ||
+        errDetails.includes("already exists") ||
+        errHint.includes("already exists")
+      ) {
+        return {
+          success: false,
+          code: "PAYMENT_VERIFICATION_PENDING",
+          error: "This payment has already been submitted and is awaiting verification.",
+        };
+      }
       return { success: false, error: insertErr?.message || "Failed to submit bank transfer." };
     }
 
-    // 3. Notify Super Admins
+    // 4. Notify Client
     const formattedAmount = formatCurrency(amount, item.currency || "INR");
+    await notifyClientUsers({
+      clientId: item.client_id,
+      type: "PAYMENT_CREATED",
+      title: "Bank transfer submitted",
+      message: `Your ${formattedAmount} bank transfer has been submitted and is awaiting verification.`,
+      link: `/client/payments/${item.id}`,
+    });
+
+    // 5. Notify Super Admins
     await notifySuperAdmins({
       type: "PAYMENT_CREATED",
       title: "Bank Transfer Submitted",
@@ -740,8 +822,20 @@ export async function submitBankTransferAction(
       payment: newPayment as unknown as Payment,
     };
   } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Unexpected server error";
-    return { success: false, error: msg };
+    const msg = err instanceof Error ? err.message : String(err || "");
+    if (
+      msg.includes("23505") ||
+      msg.includes("duplicate key") ||
+      msg.includes("uq_payments_active_pending_verification") ||
+      msg.includes("already exists")
+    ) {
+      return {
+        success: false,
+        code: "PAYMENT_VERIFICATION_PENDING",
+        error: "This payment has already been submitted and is awaiting verification.",
+      };
+    }
+    return { success: false, error: msg || "Unexpected server error" };
   }
 }
 

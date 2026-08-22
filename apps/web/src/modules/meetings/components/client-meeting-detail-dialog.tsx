@@ -34,7 +34,7 @@ export function ClientMeetingDetailDialog({
       <div
         role="dialog"
         aria-modal="true"
-        className="relative w-full max-w-md rounded-xl border border-border/80 bg-card p-6 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-150 space-y-4"
+        className="relative w-full max-w-md max-h-[calc(100dvh-1.5rem)] overflow-y-auto rounded-xl border border-border/80 bg-card p-4 sm:p-6 shadow-2xl z-50 animate-in fade-in-0 zoom-in-95 duration-150 space-y-4"
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 pb-3 border-b border-border/40">
@@ -42,9 +42,9 @@ export function ClientMeetingDetailDialog({
             <div className="flex items-center gap-2">
               <MeetingStatusBadge status={meeting.status} />
               {meeting.project && (
-                <span className="text-[11px] text-muted-foreground flex items-center gap-1">
-                  <FolderKanban className="h-3 w-3 text-primary" />
-                  <span>{meeting.project.name}</span>
+                <span className="text-[11px] text-muted-foreground flex items-center gap-1 truncate">
+                  <FolderKanban className="h-3 w-3 text-primary shrink-0" />
+                  <span className="truncate">{meeting.project.name}</span>
                 </span>
               )}
             </div>
@@ -64,12 +64,12 @@ export function ClientMeetingDetailDialog({
         {/* Date, Time & Duration Panel */}
         <div className="p-3.5 rounded-lg border border-border/60 bg-secondary/30 space-y-2">
           <div className="flex items-center gap-2 text-xs text-foreground font-medium">
-            <CalendarIcon className="h-3.5 w-3.5 text-primary" />
+            <CalendarIcon className="h-3.5 w-3.5 text-primary shrink-0" />
             <span>{formatMeetingDate(meeting.starts_at)}</span>
           </div>
           <div className="flex items-center justify-between text-xs text-muted-foreground font-mono">
             <div className="flex items-center gap-2">
-              <Clock className="h-3.5 w-3.5" />
+              <Clock className="h-3.5 w-3.5 shrink-0" />
               <span>{formatMeetingTimeRange(meeting.starts_at, meeting.ends_at)}</span>
             </div>
             <span>({calculateMeetingDuration(meeting.starts_at, meeting.ends_at)})</span>
@@ -93,13 +93,13 @@ export function ClientMeetingDetailDialog({
         )}
 
         {/* Actions Footer */}
-        <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/40">
+        <div className="grid grid-cols-2 sm:flex items-center justify-end gap-2.5 pt-3 border-t border-border/40 w-full">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => onOpenChange(false)}
-            className="text-xs h-8 cursor-pointer"
+            className="w-full sm:w-auto text-xs h-10 sm:h-8 cursor-pointer min-h-[44px] sm:min-h-0"
           >
             Close
           </Button>
@@ -109,9 +109,9 @@ export function ClientMeetingDetailDialog({
               href={meeting.meeting_url}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex"
+              className="w-full sm:w-auto inline-flex"
             >
-              <Button size="sm" className="text-xs h-8 gap-1.5 cursor-pointer">
+              <Button size="sm" className="w-full sm:w-auto text-xs h-10 sm:h-8 gap-1.5 cursor-pointer font-semibold min-h-[44px] sm:min-h-0">
                 <span>Join Meeting</span>
                 <ExternalLink className="h-3.5 w-3.5" />
               </Button>

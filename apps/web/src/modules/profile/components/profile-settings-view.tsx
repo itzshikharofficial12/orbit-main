@@ -232,7 +232,7 @@ export function ProfileSettingsView({
 
       {/* 1. PROFILE TAB */}
       {activeTab === "profile" && (
-        <div className="rounded-xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm space-y-6">
+        <div className="rounded-xl border border-border/80 bg-card p-4 sm:p-8 shadow-sm space-y-6">
           <div>
             <h3 className="text-base font-semibold text-foreground">General Profile</h3>
             <p className="text-xs text-muted-foreground">
@@ -467,7 +467,7 @@ export function ProfileSettingsView({
               <Button
                 type="submit"
                 disabled={profileLoading}
-                className="h-9 px-4 text-xs font-semibold gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto h-9 px-4 text-xs font-semibold gap-1.5 cursor-pointer min-h-[44px] sm:min-h-0"
               >
                 {profileLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -483,7 +483,7 @@ export function ProfileSettingsView({
 
       {/* 2. SECURITY TAB */}
       {activeTab === "security" && (
-        <div className="rounded-xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm space-y-6">
+        <div className="rounded-xl border border-border/80 bg-card p-4 sm:p-8 shadow-sm space-y-6">
           <div>
             <h3 className="text-base font-semibold text-foreground">Password & Authentication</h3>
             <p className="text-xs text-muted-foreground">
@@ -596,7 +596,7 @@ export function ProfileSettingsView({
               <Button
                 type="submit"
                 disabled={passwordLoading}
-                className="h-9 px-4 text-xs font-semibold gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto h-9 px-4 text-xs font-semibold gap-1.5 cursor-pointer min-h-[44px] sm:min-h-0"
               >
                 {passwordLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -612,7 +612,7 @@ export function ProfileSettingsView({
 
       {/* 3. NOTIFICATIONS TAB */}
       {activeTab === "notifications" && (
-        <div className="rounded-xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm space-y-6">
+        <div className="rounded-xl border border-border/80 bg-card p-4 sm:p-8 shadow-sm space-y-6">
           <div>
             <h3 className="text-base font-semibold text-foreground">Notification Preferences</h3>
             <p className="text-xs text-muted-foreground">
@@ -715,7 +715,7 @@ export function ProfileSettingsView({
               <Button
                 type="submit"
                 disabled={prefLoading}
-                className="h-9 px-4 text-xs font-semibold gap-1.5 cursor-pointer"
+                className="w-full sm:w-auto h-9 px-4 text-xs font-semibold gap-1.5 cursor-pointer min-h-[44px] sm:min-h-0"
               >
                 {prefLoading ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -731,7 +731,7 @@ export function ProfileSettingsView({
 
       {/* 4. ACCOUNT TAB */}
       {activeTab === "account" && (
-        <div className="rounded-xl border border-border/80 bg-card p-6 sm:p-8 shadow-sm space-y-6">
+        <div className="rounded-xl border border-border/80 bg-card p-4 sm:p-8 shadow-sm space-y-6">
           <div>
             <h3 className="text-base font-semibold text-foreground">Account Overview</h3>
             <p className="text-xs text-muted-foreground">
